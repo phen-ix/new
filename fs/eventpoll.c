@@ -2278,6 +2278,18 @@ SYSCALL_DEFINE6(epoll_pwait, int, epfd, struct epoll_event __user *, events,
 			      sigmask, sigsetsize);
 }
 
+static int ep_get_timespec64(struct timespec64 *ts,
+			     const struct __kernel_timespec __user *uts)
+{
+	struct __kernel_timespec kts;
+
+	if (copy_from_user(&kts, uts, sizeof(kts)))
+		return -EFAULT;
+	ts->tv_sec = kts.tv_sec;
+	ts->tv_nsec = kts.tv_nsec;
+	return 0;
+}
+
 SYSCALL_DEFINE6(epoll_pwait2, int, epfd, struct epoll_event __user *, events,
 		int, maxevents, const struct __kernel_timespec __user *, timeout,
 		const sigset_t __user *, sigmask, size_t, sigsetsize)
@@ -2285,7 +2297,7 @@ SYSCALL_DEFINE6(epoll_pwait2, int, epfd, struct epoll_event __user *, events,
 	struct timespec64 ts, *to = NULL;
 
 	if (timeout) {
-		if (get_timespec64(&ts, timeout))
+		if (ep_get_timespec64(&ts, timeout))
 			return -EFAULT;
 		to = &ts;
 		if (poll_select_set_timeout(to, ts.tv_sec, ts.tv_nsec))
@@ -2363,7 +2375,7 @@ COMPAT_SYSCALL_DEFINE6(epoll_pwait2, int, epfd,
 	struct timespec64 ts, *to = NULL;
 
 	if (timeout) {
-		if (get_timespec64(&ts, timeout))
+		if (ep_get_timespec64(&ts, timeout))
 			return -EFAULT;
 		to = &ts;
 		if (poll_select_set_timeout(to, ts.tv_sec, ts.tv_nsec))

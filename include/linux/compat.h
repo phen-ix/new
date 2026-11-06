@@ -7,6 +7,7 @@
  */
 
 #include <linux/types.h>
+struct __kernel_timespec;
 
 #ifdef CONFIG_COMPAT
 
