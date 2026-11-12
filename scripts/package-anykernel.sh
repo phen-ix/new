@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Package the verified miatoll kernel artifacts into an AnyKernel3 flashable ZIP.
 #
-# Inputs:  out/miatoll/artifacts/{Image,cust-atoll-ab.dtb,*-overlay.dtbo,...}
-# Output:  out/miatoll/anykernel/DOOM-Kernel-miatoll-<short-sha>.zip
+# Inputs:  out/miatoll{,-kcal}/artifacts/{Image,cust-atoll-ab.dtb,*.dtbo,...}
+# Output:  out/miatoll{,-kcal}/anykernel/DOOM-Kernel-miatoll[-kcal]-<short-sha>.zip
 #
 # Device layout (mi-atoll/device_xiaomi_miatoll @ 17-volt, BoardConfig.mk):
 #   A-only (AB_OTA_UPDATER := false), boot header v2, page size 4096,
@@ -13,8 +13,14 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-ARTIFACT_DIR="${ARTIFACT_DIR:-$ROOT/out/miatoll/artifacts}"
-OUT_DIR="${OUT_DIR:-$ROOT/out/miatoll}"
+VARIANT="${VARIANT:-nocal}"
+case "$VARIANT" in
+  nocal) DEFAULT_OUT="$ROOT/out/miatoll" ;;
+  kcal)  DEFAULT_OUT="$ROOT/out/miatoll-kcal" ;;
+  *) echo "ERROR: VARIANT must be 'nocal' or 'kcal', got '$VARIANT'" >&2; exit 1 ;;
+esac
+OUT_DIR="${OUT_DIR:-$DEFAULT_OUT}"
+ARTIFACT_DIR="${ARTIFACT_DIR:-$OUT_DIR/artifacts}"
 AK_OUT="$OUT_DIR/anykernel"
 WORK="$ROOT/.work/anykernel-package"
 
@@ -39,15 +45,32 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 [[ -f "$ARTIFACT_DIR/miatoll.config" ]] || die "Missing miatoll.config"
 [[ -f "$ARTIFACT_DIR/BUILD_INFO.txt" ]] || die "Missing BUILD_INFO.txt"
 
-# KCal must be absent from the config used for this package.
-if grep -q '^CONFIG_DRM_MSM_KCAL_CTRL=' "$ARTIFACT_DIR/miatoll.config"; then
-  die "KCal is enabled in miatoll.config; this package is for the KCal-free kernel"
+# The packaged config must match the variant this script was asked to package:
+# BUILD_INFO is written by the build, so a swapped artifact directory is caught.
+INFO_VARIANT="$(sed -n 's/^VARIANT=//p' "$ARTIFACT_DIR/BUILD_INFO.txt" | head -1)"
+[[ -z "$INFO_VARIANT" || "$INFO_VARIANT" == "$VARIANT" ]] \
+  || die "BUILD_INFO says VARIANT=$INFO_VARIANT but this run is VARIANT=$VARIANT"
+if [[ "$VARIANT" == nocal ]]; then
+  if grep -q '^CONFIG_DRM_MSM_KCAL_CTRL=' "$ARTIFACT_DIR/miatoll.config"; then
+    die "KCal is enabled in miatoll.config; the nocal package must not carry it"
+  fi
+else
+  grep -q '^CONFIG_DRM_MSM_KCAL_CTRL=y' "$ARTIFACT_DIR/miatoll.config" \
+    || die "CONFIG_DRM_MSM_KCAL_CTRL=y not found; the kcal package needs it"
 fi
 grep -q '^CONFIG_DRM_MSM=y' "$ARTIFACT_DIR/miatoll.config" || die "CONFIG_DRM_MSM=y not found"
 grep -q '^CONFIG_NOMOUNT=y' "$ARTIFACT_DIR/miatoll.config" || die "CONFIG_NOMOUNT=y not found"
 grep -q '^CONFIG_KSU=y' "$ARTIFACT_DIR/miatoll.config" || die "CONFIG_KSU=y not found"
 grep -q '^CONFIG_MEMCG=y' "$ARTIFACT_DIR/miatoll.config" || die "CONFIG_MEMCG=y not found"
 grep -q '^CONFIG_FAIR_GROUP_SCHED=y' "$ARTIFACT_DIR/miatoll.config" || die "CONFIG_FAIR_GROUP_SCHED=y not found"
+
+if [[ "$VARIANT" == kcal ]]; then
+  VARIANT_LABEL="KCal"
+  ZIP_TAG="-kcal"
+else
+  VARIANT_LABEL="KCal-free"
+  ZIP_TAG=""
+fi
 
 for f in "${DTBO_FILES[@]}"; do
   [[ -f "$ARTIFACT_DIR/$f" ]] || die "Missing DTBO: $f"
@@ -109,12 +132,12 @@ cp "$WORK/dtbo.img" "$STAGE/dtbo.img"
 
 # Device-specific installer script.
 cat > "$STAGE/anykernel.sh" <<'EOF'
-### DOOM Kernel — AnyKernel3 installer for miatoll (KCal-free, Clang 22)
+### DOOM Kernel — AnyKernel3 installer for miatoll (Clang 22, variant placeholder)
 ## Device: Xiaomi Redmi Note 9 Pro / 9S / 9 Pro Max / Poco M2 Pro (miatoll)
 ## Layout: A-only, boot header v2, DTB-in-boot, separate DTBO partition.
 
 properties() { '
-kernel.string=DOOM Kernel | miatoll (Clang 22, KCal-free)
+kernel.string=DOOM Kernel | miatoll (Clang 22, __VARIANT__)
 do.devicecheck=1
 do.modules=0
 do.systemless=0
@@ -147,11 +170,14 @@ dump_boot;
 write_boot;
 ### end install
 EOF
+sed -i "s/__VARIANT__/$VARIANT_LABEL/" "$STAGE/anykernel.sh"
+grep -q "kernel.string=DOOM Kernel | miatoll (Clang 22, $VARIANT_LABEL)" "$STAGE/anykernel.sh" \
+  || die "installer string placeholder was not substituted"
 
 # Build metadata for the flashable package.
 {
   echo "PROJECT=DOOM Kernel"
-  echo "PACKAGE=DOOM-Kernel-miatoll-${SHORT_SHA}"
+  echo "PACKAGE=DOOM-Kernel-miatoll${ZIP_TAG}-${SHORT_SHA}"
   echo "KERNEL_SOURCE_COMMIT=$SOURCE_SHA"
   echo "DEVICE=miatoll (curtana/joyeuse/excalibur/gram)"
   echo "ANDROID_TARGET=17 (VoltageOS 6.2)"
@@ -159,7 +185,8 @@ EOF
   echo "ANYKERNEL3_COMMIT=$ANYKERNEL3_COMMIT"
   echo "LIBUFDT_COMMIT=$LIBUFDT_COMMIT"
   echo "DTBO_PAGE_SIZE=$DTBO_PAGE_SIZE"
-  echo "KCAL=absent"
+  echo "VARIANT=$VARIANT"
+  echo "KCAL=$([[ "$VARIANT" == kcal ]] && echo present || echo absent)"
   echo "KSU_VERSION=$(sed -n 's/.*-DKSU_VERSION=\([0-9]*\).*/\1/p' "$ROOT/drivers/kernelsu/Makefile" | head -1)"
   echo "KSU_UAPI_VERSION=$(sed -n 's/^#define KERNEL_SU_UAPI_VERSION \([0-9]*\).*/\1/p' "$ROOT/drivers/kernelsu/include/uapi/supercall.h" | head -1)"
   echo "NOMOUNT_PROTOCOL=$(sed -n 's/^#define NOMOUNT_BASE_VERSION "\([0-9]*\)".*/\1/p' "$ROOT/fs/nomount/nomount.h" | head -1)"
@@ -201,7 +228,7 @@ stability-certified release.
 EOF
 
 # Create the ZIP (store updater-script uncompressed is not required; deflate all).
-ZIP_NAME="DOOM-Kernel-miatoll-${SHORT_SHA}.zip"
+ZIP_NAME="DOOM-Kernel-miatoll${ZIP_TAG}-${SHORT_SHA}.zip"
 ZIP_PATH="$AK_OUT/$ZIP_NAME"
 rm -f "$ZIP_PATH"
 (cd "$STAGE" && python3 - "$ZIP_PATH" <<'PY'

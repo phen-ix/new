@@ -18,11 +18,19 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
+    timeout-minutes: 120
+    strategy:
+      # Both variants must be reported even if one of them fails.
+      fail-fast: false
+      matrix:
+        # nocal: KCal compiled out (the configuration XDA/most builds ship)
+        # kcal : CONFIG_DRM_MSM_KCAL_CTRL=y, kernel-level colour calibration
+        variant: [nocal, kcal]
     env:
       TOOLCHAIN_ROOT: ${{ github.workspace }}/.work/toolchain
       BUILDTOOLS_ROOT: ${{ github.workspace }}/.work/build-tools
-      OUT_DIR: ${{ github.workspace }}/out/miatoll
+      OUT_DIR: ${{ github.workspace }}/out/miatoll-${{ matrix.variant }}
+      VARIANT: ${{ matrix.variant }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -57,7 +65,7 @@ jobs:
         if: steps.cache-llvm.outputs.cache-hit != 'true'
         run: scripts/fetch-llvm.sh
 
-      - name: Build DOOM Kernel for miatoll
+      - name: Build DOOM Kernel for miatoll (${{ matrix.variant }})
         run: scripts/build-miatoll.sh
 
       # Run logs are not always downloadable from outside CI, so surface the
@@ -70,51 +78,51 @@ jobs:
             local log="$1" n="$2"
             if grep -qE 'error:|Error [0-9]|ERROR:' "$log"; then
               grep -E 'error:|Error [0-9]|ERROR:' "$log" | head -"$n" | while IFS= read -r l; do
-                echo "::error title=build::$(printf '%s' "$l" | cut -c1-900)"
+                echo "::error title=build($VARIANT)::$(printf '%s' "$l" | cut -c1-900)"
               done
             else
               tail -"$n" "$log" | while IFS= read -r l; do
-                echo "::error title=build::$(printf '%s' "$l" | cut -c1-900)"
+                echo "::error title=build($VARIANT)::$(printf '%s' "$l" | cut -c1-900)"
               done
             fi
           }
           found=0
-          for f in out/miatoll/logs/build.log \
-                   out/miatoll/logs/defconfig.log \
-                   out/miatoll/logs/config-validation.log \
-                   out/miatoll/logs/toolchain.txt; do
+          for f in "$OUT_DIR"/logs/build.log \
+                   "$OUT_DIR"/logs/defconfig.log \
+                   "$OUT_DIR"/logs/config-validation.log \
+                   "$OUT_DIR"/logs/toolchain.txt; do
             [ -f "$f" ] || continue
             found=1
             echo "::notice::$f ($(wc -l < "$f") lines)"
             case "$f" in
-              */build.log)            report "$f" 8 ;;
-              */defconfig.log)        report "$f" 6 ;;
+              */build.log)             report "$f" 8 ;;
+              */defconfig.log)         report "$f" 6 ;;
               */config-validation.log) report "$f" 4 ;;
             esac
           done
-          [ "$found" = 1 ] || echo "::error title=build::no logs were produced at all"
+          [ "$found" = 1 ] || echo "::error title=build($VARIANT)::no logs were produced at all"
 
-      - name: Package DOOM Kernel AnyKernel3 ZIP
+      - name: Package DOOM Kernel AnyKernel3 ZIP (${{ matrix.variant }})
         run: scripts/package-anykernel.sh
 
       - name: Upload DOOM Kernel raw build artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: DOOM-Kernel-miatoll-raw-${{ github.sha }}
+          name: DOOM-Kernel-miatoll-${{ matrix.variant }}-raw-${{ github.sha }}
           path: |
-            out/miatoll/artifacts/
-            out/miatoll/logs/
+            ${{ env.OUT_DIR }}/artifacts/
+            ${{ env.OUT_DIR }}/logs/
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Upload DOOM Kernel ZIP
+      - name: Upload DOOM Kernel ZIP (${{ matrix.variant }})
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: DOOM-Kernel-miatoll-${{ github.sha }}
+          name: DOOM-Kernel-miatoll-${{ matrix.variant }}-${{ github.sha }}
           path: |
-            out/miatoll/anykernel/*.zip
-            out/miatoll/anykernel/*.zip.sha256
+            ${{ env.OUT_DIR }}/anykernel/*.zip
+            ${{ env.OUT_DIR }}/anykernel/*.zip.sha256
           if-no-files-found: warn
           retention-days: 14
