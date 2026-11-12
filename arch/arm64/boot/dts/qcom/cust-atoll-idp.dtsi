@@ -42,16 +42,19 @@
 	red {
 		label = "white";
 		/*
-		 * pm6150l.dtsi sets linux,default-trigger = "timer" on this
-		 * channel. leds-qti-tri-led.c registers with LED_KEEP_TRIGGER,
-		 * so the leds core refuses to detach a trigger from userspace
-		 * ("none" is ignored in led-triggers.c, and brightness 0 does
-		 * not remove it in led-class.c). The result is a LED that
-		 * blinks on its own from boot and cannot be handed over to the
-		 * notification-light userspace. Leave it triggerless so the
-		 * framework owns brightness/blink/breath.
+		 * Charging indication at boot. This trigger is registered by
+		 * power_supply_leds.c (CONFIG_LEDS_TRIGGERS=y, "battery" psy):
+		 * solid while POWER_SUPPLY_STATUS_FULL, blinking while
+		 * CHARGING, off otherwise, so the LED shows charger state
+		 * without any userspace help.
+		 *
+		 * The leds core can still hand the LED over to the
+		 * notification-light userspace at runtime because
+		 * leds-qti-tri-led.c no longer sets LED_KEEP_TRIGGER:
+		 * `echo none > trigger` (or `brightness = 0`) detaches it,
+		 * and `echo <other-trigger> > trigger` switches it.
 		 */
-		linux,default-trigger = "none";
+		linux,default-trigger = "battery-charging-blink-full-solid";
 	};
 
 	green {

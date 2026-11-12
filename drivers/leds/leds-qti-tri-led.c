@@ -418,7 +418,15 @@ static int qpnp_tri_led_register(struct qpnp_tri_led_chip *chip)
 		led->cdev.blink_set = qpnp_tri_led_set_blink;
 		led->cdev.default_trigger = led->default_trigger;
 		led->cdev.brightness = LED_OFF;
-		led->cdev.flags |= LED_KEEP_TRIGGER;
+		/*
+		 * Do NOT set LED_KEEP_TRIGGER here. With it set, the leds core
+		 * refuses to detach a default trigger ("none" is ignored in
+		 * led-triggers.c and brightness 0 does not remove it in
+		 * led-class.c), which leaves userspace unable to take the LED
+		 * over from the boot-time charging trigger. Keeping the flag
+		 * clear restores the standard behaviour: userspace may detach
+		 * or replace the trigger at any time.
+		 */
 
 		rc = devm_led_classdev_register(chip->dev, &led->cdev);
 		if (rc < 0) {
