@@ -72,6 +72,7 @@ required_configs=(
   CONFIG_FAIR_GROUP_SCHED=y
   CONFIG_VM_EVENT_COUNTERS=y
   CONFIG_KEYS=y
+  CONFIG_WIREGUARD=y
   CONFIG_NOMOUNT=y
 )
 for cfg in "${required_configs[@]}"; do
@@ -95,6 +96,16 @@ fi
 # requires protocol 22; do not silently package a mismatched driver.
 grep -q '^#define NOMOUNT_BASE_VERSION "22"$' "$ROOT/fs/nomount/nomount.h" || {
   echo "ERROR: NoMount protocol 22 header not found" >&2
+  exit 1
+}
+
+# WireGuard ships in-tree (drivers/net/wireguard, 1.0.0 + its own 4.14 compat
+# layer). The config gate above guarantees the code is linked into the Image;
+# record the driver version so a mismatch with the Android app / userspace
+# tools is visible instead of silent.
+WIREGUARD_VERSION="$(sed -n 's/^#define WIREGUARD_VERSION "\(.*\)"$/\1/p' "$ROOT/drivers/net/wireguard/version.h" | head -1)"
+[ -n "$WIREGUARD_VERSION" ] || {
+  echo "ERROR: could not read WIREGUARD_VERSION from drivers/net/wireguard/version.h" >&2
   exit 1
 }
 echo "Required config validation passed; KCal absent; MSM retained; NoMount protocol 22; Android 17 cgroup controllers enabled; default TCP congestion control bbr3." | tee "$LOG_DIR/config-validation.log"
@@ -171,6 +182,7 @@ fi
   echo "RUNTIME_TESTED=no"
   echo "OUTPUT_TYPE=raw Image, DTB/DTBO, modules and config; NOT a flashable boot image"
   echo "NOMOUNT_PROTOCOL=22"
+  echo "WIREGUARD_VERSION=$WIREGUARD_VERSION"
   echo "KSU_VERSION=$(sed -n 's/.*-DKSU_VERSION=\([0-9]*\).*/\1/p' "$ROOT/drivers/kernelsu/Makefile" | head -1)"
   grep -E '^(CONFIG_DRM_MSM|CONFIG_UCLAMP_TASK|CONFIG_UCLAMP_TASK_GROUP|CONFIG_SCHED_TUNE|CONFIG_KSU|CONFIG_TCP_CONG_BBR|CONFIG_TCP_CONG_BBR3|CONFIG_DEFAULT_TCP_CONG|CONFIG_MEMCG|CONFIG_FAIR_GROUP_SCHED|CONFIG_VM_EVENT_COUNTERS|CONFIG_KEYS|CONFIG_NOMOUNT)=' "$OUT_DIR/.config"
 } > "$ARTIFACT_DIR/BUILD_INFO.txt"
