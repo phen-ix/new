@@ -1,0 +1,100 @@
+cabd977f20b16b35f38505c3a57f91342ad7dd90 BACKPORT: epoll: fix compat syscall wire up of epoll_pwait2
+afb4a82692ed718dba739189699630776552ba11 BACKPORT: epoll: wire up syscall epoll_pwait2
+8d6d9887bdf6df957507ba820a5b81b5d0a7eea8 UPSTREAM: epoll: add syscall epoll_pwait2
+7137aa77e9cd15449e8791d217063eaf9c7452bb BACKPORT: epoll: convert internal api to timespec64
+b37a597495a2ae61391f531de77dbba87a869549 UPSTREAM: fs: add do_epoll_*() helpers; remove internal calls to sys_epoll_*()
+d888c4eb3a8b06d6176ef09eb65f09aeb21e40a0 UPSTREAM: close_range(): fix the logics in descriptor table trimming
+bfa5dd8ae3d449dd231f44a420219e02984e7ab9 UPSTREAM: fs: fix fd table size alignment properly
+b74cfcc96c2bdd14b4b7bc615e1cbe124bda103d UPSTREAM: fs: fd tables have to be multiples of BITS_PER_LONG
+a1ddef1d8784a1d68de6b1f11fd3abf6abc3e7aa UPSTREAM: alloc_fdtable(): change calling conventions.
+8ea01863853cbfa88ac992cb4d26d35af9c91f38 UPSTREAM: file: simplify logic in __close_range()
+f5f441f486ae07c82e6c7d5c4831e2a57c289376 UPSTREAM: file: fix close_range() for unshare+cloexec
+7f7a1207cf8a5010344b3bf2420b98fca0ec45d7 UPSTREAM: close_range: unshare all fds for CLOSE_RANGE_UNSHARE | CLOSE_RANGE_CLOEXEC
+fc9ae1184798cfa4dca70e52fff782c07ee25f30 UPSTREAM: fs, close_range: add flag CLOSE_RANGE_CLOEXEC
+7045447e3201acd5f87ef1cfae0e370a40fd05a6 BACKPORT: arch: wire-up close_range()
+1a15aaf2355e437823be891a2ae6062c9df051fa BACKPORT: close_range: add CLOSE_RANGE_UNSHARE
+4f0451882efb4ac04c0fbc92954545b6bff33224 BACKPORT: open: add close_range()
+06a2f73911b2c9dd589e9750cf1e370b06f0fce8 BACKPORT: bus: mhi: core: Remove WQ_MEM_RECLAIM flag due to warnings
+66421c23460ca5617c85ce4cbd8d58116a2b7303 fixup! bpf: decouple the lifetime of cgroup_bpf from cgroup itself
+f7462348eb36be2183690d48b9d1e5c2441c2f20 power: maxim: Suppress large frame warning
+c5b5067c52784a61eff9bf07711d81bfb9a323d4 power: supply: maxim: Fix invalid casting from a pointer to integer.
+77c45b5a52d84bf7b8125152808031bc1b8cca9b power: smb1398-charger: Fix casting to int
+6fbd0b2e7c672820cf0026987072e94c268a5754 arch: arm64: configs: Regenerate miatoll_defconfig
+06456b522ef0ecf37a3c22ea0f82885d85055c2b scripts/dtc: Update to upstream version v1.4.6-21-g84e414b0b5bc
+4cd49bcb8043622e0e84dff039e66a51abc67cf9 qcacld-3.0: cast A_ERROR return to QDF_STATUS
+9e261c96bb16b07dcb377fbfdec0e370f574bd6c qcacld-3.0: Add function typedefs for roam callbacks
+0b5e2d2c926580f9829494632fc6d0c5c6721f5a qcacld-3.0: Update nan_discovery_flush_callback
+25e6e5258b6a5284db2f1be4fcf6b387ab23c985 qcacld-3.0: Update target_if_nan_event_flush_cb
+eb028ec7dd533141cf8870634752fcf88252277b qcacld-3.0: Update wma_discard_fw_event
+eb9841bf3d39e2e239c47d04dac5853ac548ebb0 qcacld-3.0: Update lim_send_action_frm_tb_ppdu_cfg_flush_cb
+9e56081fef35a611984d6f2b136fc6d9e2be3df4 qcacld-3.0: Update to match scheduler_msg callback
+1dcfdb208d6988c5085e7fc26ebc4f52189f29ed qcacmn: Update wmi_discard_fw_event
+54c072233f7c327e2650c2592ae87e02d6dba400 qcacmn: Update scheduler_msg callback type
+fcf0b7580f2d9013795db96748602bf8b71d9967 qcacmn: Revert wlan_serialization_generic_timer_cb
+4792b562c947c088759b2da191ec3578b21435df qcacmn: Revert target_if_vdev_mgr_rsp_timer_cb
+f852da0df8e1222379d24ff97d590e78fcc30696 qcacmn: lock reo_cmd_lock earlier in dp_reo_send_cmd to avoid race cond
+ce3de8e47a714a37b1c3898139ae2b10a311d04b qcacmn: Remove leftover debug function
+2c38e9ebe439ce6170d3ffa5a5e9af9936bcc3bf qcacmn: Disable all of qdf_trace when WLAN_DEBUG is disabled
+09b093a9c4a8640e46954a4bb0972970328d7a5a qcacmn: Add void keyword to function definitions
+9369a731be3cb493746ab3eada6fea038630a9d7 qcacmn: Properly resolve disabled diag procfs
+282f3275b883d65cf2abd1ddd2e9d6a16802dd3c qcacld-3.0: Fix uninitialized tsf_op_resp usage on error
+b2d6d9f75c75db962c8bd8d96416c773dacdf587 qcacld-3.0: Fix uninitialized sessionId usage on error
+990a77b25941f8c3f718b5418a8859e052a4bd04 qcacld-3.0: Do not force the compilation of DFS debugging
+7e9ff18d3bb9e40809ee68d8efc3a248f3eee4c6 qcacld: Fix uninitalized spinlock usage
+a4a0cee7a651661a606ca7a6579e9ce16b460a19 qcacld-3.0: Re-enable NUD tracking
+4d1d1e55a27056ffafe8147b67a2a04973cfc2ae qcacld-3.0: Unguard SMMU mapping functions
+4c91674c088c54ad10df69fbd0621a85db253148 qcacld-3.0: Disable control path stats
+848ecaef9cbdb1961d72d1bd2bac059510e5f26b qcacld-3.0: Disable more debugging configs
+2ebbb9e33b16e3044ff955a3424eef9bf7dc0070 qcacld: disable debugging bloat as much as possible
+5a711501494cf4c1691e545f72bbd0b643fe50b5 qcacld-3.0: Enable SARV1 to SARV2 conversion feature
+851e483fffecbbb1b76ab9e5473bf84036eddca7 qcacld-3.0: Remove explicit -Werror flags
+a4b1e0bcea98eea3c49272dfdae7c9db3f573bf5 qcacld: Disable build timestamp
+97f8c16ff7261aa697a4f312f10ec506e61d036d qcacld-3.0: Build with -O2
+a24084112adcdde94899f3cf1f91307b813de3c3 qca-wifi-host-cmn: Fix snprintf size argument
+8367032371423332ff8c9802112e816a24a3a62f power: supply: maxim: Fix onewire_gpio driver
+006ba46a4c9c76546a917f814f458fab8043e1a0 miatoll_defconfig: Imperial-X stable r2.0
+b0272fa4cd71cb68792140f30a6993535481ea0b ARM: dts: atoll: Set GPU idle timeout to 64 ms
+373cc307e0aa558cd745fce4221f1551d2c59d08 arm64: generate dtb.img from dtbs
+794d71fff1b4c24487a6dbd6cadf8731b4bb753a scripts: Update mkdtboimg from AOSP upstream
+68f2a6d7ff70f7c3b96157369d20b640a4831484 scripts: Port mkdtboimg to python 3
+74bf0f630f2174dabf331d68eae1ea692944b863 build-dtbo: Support base dtbs which located in foreign folder
+ab1fb008b77fe505bc57710ad2f650d06da0379a scripts: use aosp python mkdtboimg for cmd_mkdtimg
+e8ee1e400fa4b6bf255d5f55ec2c55655e10cc03 dtbo.img: build device tree overlay partition image
+352a5f705d32546677363474f9c3710c6cb245f3 scripts/dtc: Update to upstream version v1.4.6-9-gaadd0b65c987
+d8259bdd09ee95cb79b3245ca8ba8697fecaaab0 scripts/dtc: Update to upstream version v1.4.5-6-gc1e55a5513e9
+aad516631f168cfb21bebc0e65fd8aafea54af84 scripts/dtc: Update to upstream version v1.4.5-3-gb1a60033c110
+7988506e25062b475e1e604b3812606eaefaf479 scripts/dtc: add fdt_overlay.c and fdt_addresses.c to sync script
+76b9b497c549360df545348324f894cf2dbc64f5 setlocalversion: Never append a "+" to localversion
+69642abaf3130b3e3a836908a0066e4afad273ca miatoll_defconfig: Imperial-X stable r1.0
+7b2d20e65c6bcc87b64cfba5b71a4eec4657f8e4 power: qpnp-smb5: fix charge_full_design wrongly reporting mAh instead of uAh
+5c8331010a2ed0b317d543fbf9d4211d2f4fd658 sched: idle: Optimize the generic idle loop by removing needless memory barrier
+3189912a8766b6989ee8f7f63387645fbe8f7711 msm: kgsl: Wake GPU upon receiving an ioctl rather than upon touch input
+846c37c4b7d5f0b08f99fb49fe2048630624c8e9 msm: kgsl: Remove L2PC PM QoS feature
+84281155b9817e68df7cd4f37fd04cdaa63d979d msm/sde/rotator: Remove unneeded PM QoS requests
+2fb1adc89e4b555bf6ccb6f70bc4bb55583960c9 drm/msm/sde: Remove unneeded PM QoS requests
+5b5a66d832d5429746e9738ebe5bf8de7b73f312 scsi: ufs: Set latency requirement to 67 us
+fd0b6f017f9ed6cda4399afaf3c90a3ba22fbebc scsi: ufs: Add simple IRQ-affined PM QoS operations
+cc89f62d0d338baa95f653423cc0c153b11dc5e4 scsi: ufs: Scrap Qualcomm's PM QoS implementation
+ca4235fb3188fcd15465608f0241e849b2236d78 scsi: ufs: Don't turn off link for few vendor devices
+477bacd9a285a5379725687d8f637012b24b7dcf scsi: ufs: Fix imbalanced scsi_block_reqs_cnt caused by ufshcd_hold()
+1194b14bb4630a3e9df516686ca36625cb3a2a7e scsi: ufs: fix broken hba->outstanding_tasks
+ff7054ffea160b456b3f8601feb993a25d6b0dfb scsi: ufs: Fix ufshcd_hold dead loop issue if error recovery is handing
+53d02751d3f4ccb00cb575d4bf4c3a53dc22dcff scsi: ufs: Fix back to back clk gate work
+7e860c325a2a159a867409b02a903ed1d35c26a2 scsi/ufs: fix off-by-one error when printing err stat
+5578138feb0792661e9ebd5b9e91ff1d5e470b2f scsi: ufshcd: Fix double release of hba
+2485e5dacf6090099bebb3cccfcbf1caebb8640d scsi: ufs: Disable irq before turning off clocks in suspend path
+ec678c487f287325335e79b71a1e4516ec77aedc scsi: ufs: fix wrong sequence of lrb_in_use and pm
+24cd1fd50c6a3b7939b1b7e44a5a0098e936af70 scsi: ufs: fix buffer overflow when access descriptor
+9bd98b7f90d451f47ff8bad2d6482b655adc7536 scsi: ufs: disable clocks all the time when autohibern8 supports
+2686ef5b15827e9eb38819e030f79cd4cb205719 scsi: ufs: Avoid race condition between reinit and suspend
+5b66b3af2e4ab597315920a5122637ab667f89ca scsi: ufs: set autohibern8 timer regardless of hibern8_on_idle
+ea0fd065f744041c47cc28c97d7e1a1d0679dc4b scsi: ufs: disable hibern8_on_idle
+e46464a74e7e755b7edefde46a391aaef0e47878 scsi: ufs: re-probing hba when UFS initialization failed.
+656d14985a5ee2b4193426221609b1e2eac75ffd Revert "scsi: ufs: update VCCQ and VCCQ2 min value"
+2a10ba756e0f05bf0a62533a56ee46cb103d9f2f Revert "Revert "Revert "scsi: ufs-qcom: Add flag to keep track of PHY's power state"""
+3e5458a59463b025f31b68f7b7bd3a4c3ee57cce scsi: ufs: use async operation for hibern8 operation
+fa6fa3427575dd104be171b3a21690c81f218820 scsi: ufs: disable HIBERN8_WITH_CLK_GATING
+a3ed1d390c21a29c9d7b448189b8d559bf78d185 scsi: ufs: disallow SECURITY_PROTOCOL_IN without _OUT
+0ba4c4acaa39e29fbf93f304711d6dae1252a6c3 scsi: ufs: fix missing up_write()
+96f514cbe8b4bda60eebd5765fb1f0d49fba4a90 scsi: ufs: check memory region correctly
+2e12308dda52da450aea4e6883877d8eb33678ce scsi: ufs: read length should give full buffer
