@@ -20,7 +20,7 @@ LLVM_SIZE=1938859476
 CLANG_DIR="$DEST/llvm-$LLVM_VERSION"
 BUILDTOOLS_COMMIT="f61cfbcb609173e1040753a2b9e8fbe8517343f9"
 
-die() { echo "ERROR: $*" >&2; exit 1; }
+die() { echo "::error title=toolchain::$*" >&2; echo "ERROR: $*" >&2; exit 1; }
 
 mkdir -p "$DEST" "$(dirname "$BUILDTOOLS_DIR")"
 
@@ -28,9 +28,11 @@ if [[ ! -x "$CLANG_DIR/bin/clang" || ! -x "$CLANG_DIR/bin/ld.lld" ]]; then
   rm -rf "$CLANG_DIR"
   tmp="$(mktemp -d "${TMPDIR:-/tmp}/llvm-dl.XXXXXX")"
   trap 'rm -rf "$tmp"' EXIT
-  echo "Downloading $LLVM_URL"
+  echo "Downloading $LLVM_URL" >&2
   curl -fL --retry 3 --retry-delay 5 --connect-timeout 30 \
-    -o "$tmp/$LLVM_TARBALL" "$LLVM_URL"
+    -o "$tmp/$LLVM_TARBALL" "$LLVM_URL" \
+    || die "downloading $LLVM_URL failed"
+  echo "Downloaded $(stat -c%s "$tmp/$LLVM_TARBALL") bytes"
 
   size="$(stat -c%s "$tmp/$LLVM_TARBALL")"
   [[ "$size" == "$LLVM_SIZE" ]] \
@@ -39,7 +41,8 @@ if [[ ! -x "$CLANG_DIR/bin/clang" || ! -x "$CLANG_DIR/bin/ld.lld" ]]; then
     || die "$LLVM_TARBALL failed its SHA-256 pin"
 
   mkdir -p "$CLANG_DIR"
-  tar -xJf "$tmp/$LLVM_TARBALL" -C "$CLANG_DIR" --strip-components=1
+  tar -xJf "$tmp/$LLVM_TARBALL" -C "$CLANG_DIR" --strip-components=1 \
+    || die "extracting $LLVM_TARBALL failed (disk space?)"
   rm -rf "$tmp"
   trap - EXIT
 
@@ -64,12 +67,27 @@ fi
 export PATH="$CLANG_DIR/bin:$BUILDTOOLS_DIR/path/linux-x86:$BUILDTOOLS_DIR/linux-x86/bin:$PATH"
 export LD_LIBRARY_PATH="$BUILDTOOLS_DIR/linux-x86/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
-clang --version | head -1 | grep -F "clang version $LLVM_VERSION" \
-  || die "clang is not $LLVM_VERSION"
-ld.lld --version | grep -F "LLD $LLVM_VERSION" \
-  || die "ld.lld is not $LLVM_VERSION"
-llvm-ar --version | head -1 | grep -F "LLVM version $LLVM_VERSION" \
-  || die "llvm-ar is not $LLVM_VERSION"
+# Each of these tools prints its version differently: clang puts it on the
+# first line, ld.lld prints "LLD x.y.z", and the llvm-* tools print a banner
+# line followed by "LLVM version x.y.z", so search whole outputs.
+clang_version="$(clang --version | head -1)"
+lld_version="$(ld.lld --version | head -1)"
+ar_version="$(llvm-ar --version | tr '\n' ' ')"
+
+[[ "$clang_version" == *"clang version $LLVM_VERSION"* ]] \
+  || die "clang is not $LLVM_VERSION: $clang_version"
+[[ "$lld_version" == *"LLD $LLVM_VERSION"* ]] \
+  || die "ld.lld is not $LLVM_VERSION: $lld_version"
+[[ "$ar_version" == *"LLVM version $LLVM_VERSION"* ]] \
+  || die "llvm-ar is not $LLVM_VERSION: $ar_version"
+
+for tool in clang ld.lld llvm-ar llvm-nm llvm-objcopy llvm-objdump llvm-strip; do
+  [[ -x "$CLANG_DIR/bin/${tool%% *}" ]] || die "missing $tool in $CLANG_DIR/bin"
+done
+
+echo "clang: $clang_version"
+echo "lld:   $lld_version"
+echo "ar:    ${ar_version:0:60}"
 flex --version
 bison --version | head -1
 bc --version | head -1
