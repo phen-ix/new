@@ -748,6 +748,7 @@ config TCP_CONG_CUBIC
 
 config DEFAULT_TCP_CONG
 	string
+	default "bbr3" if TCP_CONG_BBR3
 	default "bic" if DEFAULT_BIC
 	default "cubic" if DEFAULT_CUBIC
 	default "htcp" if DEFAULT_HTCP
