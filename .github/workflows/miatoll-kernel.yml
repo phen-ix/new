@@ -1,4 +1,4 @@
-name: DOOM Kernel — miatoll (Clang 18)
+name: DOOM Kernel — miatoll (Clang 22)
 
 on:
   push:
@@ -35,6 +35,15 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             bc bison flex libssl-dev libelf-dev cpio curl git xz-utils python3
 
+      - name: Free runner disk space
+        run: |
+          # The Clang 22 release tarball is ~1.9 GB and expands to several GB,
+          # then the kernel build needs a few more; drop unused preinstalled
+          # SDKs so the runner does not run out of disk mid-build.
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          df -h /
+
       - name: Cache pinned LLVM toolchain
         id: cache-llvm
         uses: actions/cache@v4
@@ -42,7 +51,7 @@ jobs:
           path: |
             .work/toolchain
             .work/build-tools
-          key: llvm-r522817-buildtools-f61cfbcb-${{ runner.os }}
+          key: llvm-22.1.8-buildtools-f61cfbcb-${{ runner.os }}
 
       - name: Fetch and verify pinned toolchain
         if: steps.cache-llvm.outputs.cache-hit != 'true'

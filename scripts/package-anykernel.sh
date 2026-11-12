@@ -109,12 +109,12 @@ cp "$WORK/dtbo.img" "$STAGE/dtbo.img"
 
 # Device-specific installer script.
 cat > "$STAGE/anykernel.sh" <<'EOF'
-### DOOM Kernel — AnyKernel3 installer for miatoll (KCal-free, Clang 18)
+### DOOM Kernel — AnyKernel3 installer for miatoll (KCal-free, Clang 22)
 ## Device: Xiaomi Redmi Note 9 Pro / 9S / 9 Pro Max / Poco M2 Pro (miatoll)
 ## Layout: A-only, boot header v2, DTB-in-boot, separate DTBO partition.
 
 properties() { '
-kernel.string=DOOM Kernel | miatoll (Clang 18, KCal-free)
+kernel.string=DOOM Kernel | miatoll (Clang 22, KCal-free)
 do.devicecheck=1
 do.modules=0
 do.systemless=0
@@ -172,7 +172,7 @@ cat > "$STAGE/README.txt" <<EOF
 DOOM Kernel — miatoll AnyKernel3 flashable ZIP (KCal-free)
 =================================================
 Kernel source commit: $SOURCE_SHA
-Toolchain: Android Clang/LLD 18.0.1 (LLVM=1 LLVM_IAS=1)
+Toolchain: upstream LLVM/Clang/LLD 22.1.8 (LLVM=1 LLVM_IAS=1)
 Target: VoltageOS 6.2 / Android 17, Xiaomi miatoll
 Devices: curtana, joyeuse, excalibur, gram (unified miatoll)
 

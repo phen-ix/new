@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-2.0
-# Reproducible pure-Clang 18 miatoll build. No GNU cross compiler is used.
+# Reproducible pure-Clang 22 miatoll build. No GNU cross compiler is used.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT_DIR="${OUT_DIR:-$ROOT/out/miatoll}"
 TOOLCHAIN_ROOT="${TOOLCHAIN_ROOT:-$ROOT/.work/toolchain}"
 BUILDTOOLS_ROOT="${BUILDTOOLS_ROOT:-$ROOT/.work/build-tools}"
-CLANG_DIR="$TOOLCHAIN_ROOT/clang-r522817"
+CLANG_DIR="$TOOLCHAIN_ROOT/llvm-22.1.8"
 LOG_DIR="${LOG_DIR:-$OUT_DIR/logs}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-$OUT_DIR/artifacts}"
 DEFCONFIG="vendor/xiaomi/miatoll_defconfig"
@@ -30,8 +30,8 @@ export LD_LIBRARY_PATH="$BUILDTOOLS_ROOT/linux-x86/lib64${LD_LIBRARY_PATH:+:$LD_
   echo "SOURCE_COMMIT=$(git -C "$ROOT" rev-parse HEAD)"
 } | tee "$LOG_DIR/toolchain.txt"
 
-clang --version | head -1 | grep -F 'clang version 18.0.1' >/dev/null
-ld.lld --version | grep -F 'LLD 18.0.1' >/dev/null
+clang --version | head -1 | grep -F 'clang version 22.1.8' >/dev/null
+ld.lld --version | grep -F 'LLD 22.1.8' >/dev/null
 
 MAKE_ARGS=(
   O="$OUT_DIR"
@@ -176,7 +176,7 @@ fi
   echo "KERNEL_RELEASE=$(make -s -C "$ROOT" O="$OUT_DIR" ARCH=arm64 kernelrelease)"
   echo "SOURCE_COMMIT=$(git -C "$ROOT" rev-parse HEAD)"
   echo "DEFCONFIG=$DEFCONFIG"
-  echo "TOOLCHAIN=Android Clang/LLD 18.0.1 (r522817)"
+  echo "TOOLCHAIN=upstream LLVM/Clang/LLD 22.1.8 (release tarball, sha256 pinned)"
   echo "BUILD_FLAGS=ARCH=arm64 SUBARCH=arm64 LLVM=1 LLVM_IAS=1"
   echo "KCAL=absent (configuration and linked-symbol checks passed)"
   echo "RUNTIME_TESTED=no"
