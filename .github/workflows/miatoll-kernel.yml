@@ -60,6 +60,30 @@ jobs:
       - name: Build DOOM Kernel for miatoll
         run: scripts/build-miatoll.sh
 
+      # Run logs are not always downloadable from outside CI, so surface the
+      # first compile errors as check-run annotations that any API client can
+      # read (they also show up on the PR/commit page).
+      - name: Report build errors as annotations
+        if: failure()
+        run: |
+          LOG=out/miatoll/logs/build.log
+          if [ ! -f "$LOG" ]; then
+            echo "::error title=build::no build log at $LOG"
+            exit 0
+          fi
+          echo "build log: $(wc -l < "$LOG") lines"
+          fail_line=$(grep -n -m1 'Error [0-9]' "$LOG" | cut -d: -f1 || true)
+          if [ -n "$fail_line" ]; then
+            sed -n "$((fail_line > 25 ? fail_line - 25 : 1)),${fail_line}p" "$LOG" \
+              | grep -E 'error:|Error [0-9]' | tail -8 | while IFS= read -r line; do
+                  echo "::error title=compile::$(printf '%s' "$line" | cut -c1-900)"
+                done
+          else
+            grep -m8 -E 'error:' "$LOG" | while IFS= read -r line; do
+              echo "::error title=compile::$(printf '%s' "$line" | cut -c1-900)"
+            done
+          fi
+
       - name: Package DOOM Kernel AnyKernel3 ZIP
         run: scripts/package-anykernel.sh
 
