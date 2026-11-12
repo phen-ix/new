@@ -752,3 +752,9 @@ CONFIG_NOMOUNT=y
 
 # Genuine Google BBRv3 (selectable as "bbr3"; BBRv1 and CUBIC preserved).
 CONFIG_TCP_CONG_BBR3=y
+
+# Make bbr3 the congestion control applied to new sockets at boot
+# (late_initcall(tcp_congestion_default) runs after bbr_register() because
+# tcp_bbr3.o is built in, not modular). CUBIC stays built in as the fallback
+# the stack logs to if the algorithm is ever unavailable.
+CONFIG_DEFAULT_TCP_CONG="bbr3"

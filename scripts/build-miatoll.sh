@@ -63,7 +63,7 @@ required_configs=(
   CONFIG_TCP_CONG_BBR=y
   CONFIG_TCP_CONG_BBR3=y
   CONFIG_DRM_MSM=y
-  CONFIG_DEFAULT_TCP_CONG=\"cubic\"
+  'CONFIG_DEFAULT_TCP_CONG="bbr3"'
   CONFIG_ARM64=y
   CONFIG_MODULES=y
   CONFIG_LTO_CLANG=y
@@ -97,7 +97,7 @@ grep -q '^#define NOMOUNT_BASE_VERSION "22"$' "$ROOT/fs/nomount/nomount.h" || {
   echo "ERROR: NoMount protocol 22 header not found" >&2
   exit 1
 }
-echo "Required config validation passed; KCal absent; MSM retained; NoMount protocol 22; Android 17 cgroup controllers enabled." | tee "$LOG_DIR/config-validation.log"
+echo "Required config validation passed; KCal absent; MSM retained; NoMount protocol 22; Android 17 cgroup controllers enabled; default TCP congestion control bbr3." | tee "$LOG_DIR/config-validation.log"
 
 set +e
 make -C "$ROOT" "${MAKE_ARGS[@]}" -j"$(nproc)" Image dtbs modules \
@@ -172,7 +172,7 @@ fi
   echo "OUTPUT_TYPE=raw Image, DTB/DTBO, modules and config; NOT a flashable boot image"
   echo "NOMOUNT_PROTOCOL=22"
   echo "KSU_VERSION=$(sed -n 's/.*-DKSU_VERSION=\([0-9]*\).*/\1/p' "$ROOT/drivers/kernelsu/Makefile" | head -1)"
-  grep -E '^(CONFIG_DRM_MSM|CONFIG_UCLAMP_TASK|CONFIG_UCLAMP_TASK_GROUP|CONFIG_SCHED_TUNE|CONFIG_KSU|CONFIG_TCP_CONG_BBR|CONFIG_TCP_CONG_BBR3|CONFIG_MEMCG|CONFIG_FAIR_GROUP_SCHED|CONFIG_VM_EVENT_COUNTERS|CONFIG_KEYS|CONFIG_NOMOUNT)=' "$OUT_DIR/.config"
+  grep -E '^(CONFIG_DRM_MSM|CONFIG_UCLAMP_TASK|CONFIG_UCLAMP_TASK_GROUP|CONFIG_SCHED_TUNE|CONFIG_KSU|CONFIG_TCP_CONG_BBR|CONFIG_TCP_CONG_BBR3|CONFIG_DEFAULT_TCP_CONG|CONFIG_MEMCG|CONFIG_FAIR_GROUP_SCHED|CONFIG_VM_EVENT_COUNTERS|CONFIG_KEYS|CONFIG_NOMOUNT)=' "$OUT_DIR/.config"
 } > "$ARTIFACT_DIR/BUILD_INFO.txt"
 
 # Use paths relative to the artifact directory so checksums remain valid
