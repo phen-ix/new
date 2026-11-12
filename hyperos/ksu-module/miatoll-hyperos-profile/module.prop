@@ -1,0 +1,6 @@
+id=miatoll_hyperos_profile
+name=DOOM HyperOS Port Profile (miatoll)
+version=v0.1-framework
+versionCode=1
+author=DOOM Kernel
+description=Applies the DOOM HyperOS-specific profile for HyperOS_Miatoll_20261107_OS3.0.3.0.VLCCNXM only. Inert until the profile contains READY (evidence-backed) entries; every write is backed up and revertible. Do NOT enable on any other ROM.

@@ -1,0 +1,96 @@
+# DOOM HyperOS profile — validation log (sandbox, 2026-11-12T16:19:36Z)
+# What was executed here, and what its output was. Nothing in this log was
+# produced on a phone: the sandbox has no miatoll device and cannot reach
+# pixeldrain, so kernel-side behaviour on hardware is UNTESTED.
+
+## 1. shell/python syntax
+bash -n OK  hyperos/tools/device-metrics.sh
+bash -n OK  hyperos/tools/doom-profile.sh
+bash -n OK  hyperos/tools/rom-evidence.sh
+bash -n OK  hyperos/tools/sync-module.sh
+bash -n OK  hyperos/ksu-module/miatoll-hyperos-profile/post-fs-data.sh
+bash -n OK  hyperos/ksu-module/miatoll-hyperos-profile/service.sh
+bash -n OK  hyperos/ksu-module/miatoll-hyperos-profile/uninstall.sh
+sh -n OK    hyperos/tools/doom-profile.sh (dash/mksh compatible)
+py_compile OK hyperos/tools/compare.py
+
+## 2. profile engine against a mock sysfs/proc tree
+$ sh hyperos/tools/doom-profile.sh --audit --root /tmp/mockroot --state /tmp/state3
+PENDING SAME      /sys/devices/system/cpu/cpufreq/policy0/schedutil/up_rate_limit_us 500 500 E-01
+PENDING SAME      /sys/devices/system/cpu/cpufreq/policy6/schedutil/up_rate_limit_us 500 500 E-01
+PENDING SAME      /sys/devices/system/cpu/cpufreq/policy0/schedutil/down_rate_limit_us 1000 1000 E-01
+PENDING SAME      /sys/devices/system/cpu/cpufreq/policy6/schedutil/down_rate_limit_us 1000 1000 E-01
+PENDING SAME      /sys/devices/system/cpu/cpufreq/policy0/schedutil/iowait_boost_enable 0 0 E-02
+PENDING SAME      /sys/devices/system/cpu/cpufreq/policy6/schedutil/iowait_boost_enable 0 0 E-02
+PENDING DIFF      /proc/sys/kernel/sched_group_upmigrate 1 100 E-03
+PENDING DIFF      /proc/sys/kernel/sched_group_downmigrate 1 95 E-03
+PENDING DIFF      /proc/sys/kernel/sched_boost 1 0 E-04
+PENDING DIFF      /proc/sys/kernel/sched_conservative_pl 1 0 E-05
+PENDING DIFF      /proc/sys/kernel/sched_many_wakeup_threshold 1 1000 E-05
+PENDING DIFF      /proc/sys/kernel/sched_min_task_util_for_boost 1 51 E-05
+PENDING DIFF      /proc/sys/kernel/sched_min_task_util_for_colocation 1 35 E-05
+PENDING DIFF      /proc/sys/kernel/sched_little_cluster_coloc_fmin_khz 1 1000000 E-06
+PENDING OBSERVE   /sys/devices/system/cpu/cpu6/core_ctl/enable 1 - E-07
+PENDING OBSERVE   /sys/devices/system/cpu/cpu6/core_ctl/min_cpus 0 - E-07
+PENDING OBSERVE   /sys/devices/system/cpu/cpu6/core_ctl/max_cpus 2 - E-07
+PENDING OBSERVE   /sys/devices/system/cpu/cpu6/core_ctl/offline_delay_ms 100 - E-07
+PENDING OBSERVE   /sys/devices/system/cpu/cpu6/core_ctl/busy_up_thres 0 0 - E-07
+PENDING OBSERVE   /sys/devices/system/cpu/cpu6/core_ctl/busy_down_thres 0 0 - E-07
+...
+
+## 3. gate enforcement: apply on the real profile (all PENDING)
+$ sh hyperos/tools/doom-profile.sh --apply --root /tmp/mockroot --state /tmp/state4
+no READY entries in profile -> nothing to apply (by design).
+run --audit to snapshot current values; use --allow-pending to override.
+
+## 4. apply/revert round-trip on a profile with two READY entries
+$ apply
+applied: /proc/sys/kernel/sched_group_upmigrate : 1 -> 100
+applied: /proc/sys/kernel/sched_group_downmigrate : 1 -> 95
+summary: applied=2 skipped=34 failed=0 backup=/tmp/state5/backup-20261112T161936Z.tsv
+values now: upmigrate=100 downmigrate=95
+$ revert
+# reverting from /tmp/state5/backup-20261112T161936Z.tsv
+restored: /proc/sys/kernel/sched_group_upmigrate : 100 -> 1
+restored: /proc/sys/kernel/sched_group_downmigrate : 95 -> 1
+summary: restored=2 failed=0
+values after revert: upmigrate=1 downmigrate=1
+
+## 5. safety refusals (missing / read-only / out-of-bounds / duplicate)
+already set: /proc/sys/vm/swappiness = 60
+already set: /proc/sys/vm/extra_free_kbytes = 0
+WARN: not writable, skipped: /proc/sys/vm/watermark_scale_factor (E-99)
+WARN: missing node, skipped: /proc/sys/vm/does_not_exist (E-99)
+WARN: target out of declared bounds, skipped: /proc/sys/vm/swappiness = 9999 [0..200] (E-99)
+summary: applied=0 skipped=5 failed=0 backup=/tmp/state6/backup-20261112T161937Z.tsv
+
+## 6. gfxinfo framestats parser (synthetic AOSP-format sample)
+frames=3 jank=33.3% p50=16.70 p90=43.00 p99=43.00
+ui,scroll_frames,3,frames,3
+ui,scroll_jank_pct,33.3,pct,3
+ui,scroll_p50_ms,16.70,ms,3
+ui,scroll_p90_ms,43.00,ms,3
+ui,scroll_p99_ms,43.00,ms,3
+
+## 7. compare.py on synthetic before/after CSVs
+- rules   : verdict needs |delta| >= 3.0% and n >= 5 on both sides
+
+| scenario | metric | baseline | after | delta | n | verdict |
+|---|---|---|---|---|---|---|
+| launch | totaltime_median | 412.0 ms | 380.0 ms | -7.8% | 7/7 | IMPROVED |
+| launch | totaltime_p90 | 520.0 ms | 470.0 ms | -9.6% | 7/7 | IMPROVED |
+| static | swappiness | 85.0  | 85.0  | — | 1/1 | INFO |
+| static | thermal_max_temp_mc | 48,000 mC | 50,000 mC | — | 1/1 | INFO |
+| ui | jank_pct | 18.0 pct | 11.0 pct | — | 1/1 | INFO |
+| ui | p90_ms | 24.0 ms | 19.0 ms | — | 1/1 | INFO |
+
+## 8. rom-evidence.sh against a synthetic archive
+
+Attach: 00-archive.txt 01-boot.txt 03-dtbo.txt 04-dynamic-partitions.txt
+        05-props.txt 06-power-thermal.txt 07-init-services.txt 08-filesystems.txt
+These are text and small; the raw images stay in /tmp/fx/out2/work.
+
+## NOT TESTED
+- kernel build with hyperos_compat.config (no toolchain in sandbox)
+- any sysfs node on a real miatoll device
+- the ROM package itself (egress blocked: curl (35) SSL_ERROR_SYSCALL)
