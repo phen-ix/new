@@ -19,6 +19,7 @@ hyperos/
 ├── REPORT.md                     التقرير الكامل + Git diff + بروتوكول الاختبار
 ├── README.md                     هذا الملف
 ├── evidence/EVIDENCE-REQUIRED.md ما هو مطلوب، ولماذا، وأي قرار يفتحه
+├── evidence/KERNEL-TREE.md       تصحيح: شجرة/فرع نواة DOOM الحقيقية + ما يتغيّر في التقرير
 ├── profiles/hyperos-os3.0.3-miatoll.conf   36 بندًا (15 observe-only) مع بوابة دليل
 ├── tools/
 │   ├── doom-profile.sh           --audit | --apply | --revert | --status | --diff

@@ -75,7 +75,13 @@ $ curl -sS -o /dev/null -w "%{http_code}" https://api.github.com   →  200
 | سجل الالتزامات | **التزام واحد** `7bc580b93 drm/msm/sde: add KCAL color control` يحتوي الشجرة كاملة | `git rev-list --count HEAD` = 1 |
 | الحُزم | `CONFIG_PREEMPT=y`, `CONFIG_HZ_300`, `CONFIG_NO_HZ=y` | miatoll_defconfig |
 
-> **تنبيه هوية:** الوصف المطلوب يقول `4.14.357-openela`. الشجرة `4.14.356-openela-rc1`. الفارق ليس تجميليًا: `.357` يحتوي إصلاحات أمنية/شبكية فوق هذه الشجرة.
+> **تنبيه هوية (مُحدَّث):** الشجرة الحقيقية لنواة DOOM هي **`phen-ix/kernel`، فرع
+> `arena/c39745c5-kernel`** (4.14.357، `CONFIG_LOCALVERSION="-DOOM"`، xxKSU 32714،
+> `CONFIG_TCP_CONG_BBR3=y`, `CONFIG_EROFS_FS=y`). الشجرة التي فُحصت هنا
+> (`phen-ix/new` @ `7bc580b93`) هي قاعدة CAF 4.14.356-rc1 + KCAL فقط. لذلك
+> الحقائق الخاصة بالتهيئة (KSU/BBRv3/الحاكم الافتراضي/EROFS) تنطبق على شجرة
+> القاعدة لا على شجرة DOOM — والتصحيح الكامل في
+> [`evidence/KERNEL-TREE.md`](evidence/KERNEL-TREE.md).
 
 ### 2.2 KernelSU و BBRv3 — غير موجودين في هذه الشجرة
 
