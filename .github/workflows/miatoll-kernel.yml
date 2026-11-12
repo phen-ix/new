@@ -61,28 +61,38 @@ jobs:
         run: scripts/build-miatoll.sh
 
       # Run logs are not always downloadable from outside CI, so surface the
-      # first compile errors as check-run annotations that any API client can
+      # failing diagnostic as check-run annotations that any API client can
       # read (they also show up on the PR/commit page).
       - name: Report build errors as annotations
         if: failure()
         run: |
-          LOG=out/miatoll/logs/build.log
-          if [ ! -f "$LOG" ]; then
-            echo "::error title=build::no build log at $LOG"
-            exit 0
-          fi
-          echo "build log: $(wc -l < "$LOG") lines"
-          fail_line=$(grep -n -m1 'Error [0-9]' "$LOG" | cut -d: -f1 || true)
-          if [ -n "$fail_line" ]; then
-            sed -n "$((fail_line > 25 ? fail_line - 25 : 1)),${fail_line}p" "$LOG" \
-              | grep -E 'error:|Error [0-9]' | tail -8 | while IFS= read -r line; do
-                  echo "::error title=compile::$(printf '%s' "$line" | cut -c1-900)"
-                done
-          else
-            grep -m8 -E 'error:' "$LOG" | while IFS= read -r line; do
-              echo "::error title=compile::$(printf '%s' "$line" | cut -c1-900)"
-            done
-          fi
+          report() {  # $1 = log file, $2 = how many lines
+            local log="$1" n="$2"
+            if grep -qE 'error:|Error [0-9]|ERROR:' "$log"; then
+              grep -E 'error:|Error [0-9]|ERROR:' "$log" | head -"$n" | while IFS= read -r l; do
+                echo "::error title=build::$(printf '%s' "$l" | cut -c1-900)"
+              done
+            else
+              tail -"$n" "$log" | while IFS= read -r l; do
+                echo "::error title=build::$(printf '%s' "$l" | cut -c1-900)"
+              done
+            fi
+          }
+          found=0
+          for f in out/miatoll/logs/build.log \
+                   out/miatoll/logs/defconfig.log \
+                   out/miatoll/logs/config-validation.log \
+                   out/miatoll/logs/toolchain.txt; do
+            [ -f "$f" ] || continue
+            found=1
+            echo "::notice::$f ($(wc -l < "$f") lines)"
+            case "$f" in
+              */build.log)            report "$f" 8 ;;
+              */defconfig.log)        report "$f" 6 ;;
+              */config-validation.log) report "$f" 4 ;;
+            esac
+          done
+          [ "$found" = 1 ] || echo "::error title=build::no logs were produced at all"
 
       - name: Package DOOM Kernel AnyKernel3 ZIP
         run: scripts/package-anykernel.sh

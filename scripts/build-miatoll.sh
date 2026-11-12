@@ -77,7 +77,8 @@ required_configs=(
 )
 for cfg in "${required_configs[@]}"; do
   if ! grep -qxF "$cfg" "$OUT_DIR/.config"; then
-    echo "ERROR: required config missing: $cfg" >&2
+    echo "ERROR: required config missing: $cfg" \
+      | tee "$LOG_DIR/config-validation.log" >&2
     exit 1
   fi
 done
