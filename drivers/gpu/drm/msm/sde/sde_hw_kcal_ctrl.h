@@ -65,6 +65,17 @@ struct drm_msm_pa_hsic sde_hw_kcal_hsic_struct(void);
 void sde_hw_kcal_pcc_adjust(u32 *data, int plane);
 
 /**
+ * sde_hw_kcal_hsic_active() - true only if KCAL changes hue/sat/val/contrast.
+ *
+ * The HSIC block has a single writer per frame: while KCAL is enabled the
+ * ROM's own HSIC writes are bypassed. When KCAL's HSIC values are still at
+ * their neutral defaults there is nothing for KCAL to apply, so the ROM
+ * (LiveDisplay and friends) must keep the block. PCC is unaffected: KCAL
+ * multiplies the coefficients the ROM wrote instead of replacing them.
+ */
+bool sde_hw_kcal_hsic_active(void);
+
+/**
  * kcal_force_update() - force reprocessing on config change.
  */
 void kcal_force_update(void);
@@ -87,5 +98,10 @@ static inline struct drm_msm_pa_hsic sde_hw_kcal_hsic_struct(void)
 static inline void sde_hw_kcal_pcc_adjust(u32 *data, int plane)
 {
 
+}
+
+static inline bool sde_hw_kcal_hsic_active(void)
+{
+	return false;
 }
 #endif

@@ -195,8 +195,31 @@ grep -q "kernel.string=DOOM Kernel | miatoll (Clang 22, $VARIANT_LABEL)" "$STAGE
   echo "MODULES_INCLUDED=no (tcp_bic/tcp_htcp remain optional raw artifacts)"
 } > "$STAGE/PACKAGE_INFO.txt"
 
+if [[ "$VARIANT" == kcal ]]; then
+  COLOUR_TITLE="KCal"
+  COLOUR_SECTION="Colour control (KCal):
+  Kernel-level calibration is exposed under
+    /sys/devices/platform/kcal_ctrl/kcal          \"R G B\" gains (256 = neutral)
+    /sys/devices/platform/kcal_ctrl/kcal_enable   1 = on, 0 = off
+    /sys/devices/platform/kcal_ctrl/kcal_min      minimum gain (20)
+    /sys/devices/platform/kcal_ctrl/kcal_hue      hue
+    /sys/devices/platform/kcal_ctrl/kcal_sat      saturation
+    /sys/devices/platform/kcal_ctrl/kcal_val      value
+    /sys/devices/platform/kcal_ctrl/kcal_cont     contrast
+  LiveDisplay / the ROM's colour management keeps working as long as the
+  KCAL hue/sat/val/cont values stay at their neutral defaults
+  (0 / 255 / 255 / 255): the PCC gains are multiplied into the ROM's own
+  coefficients, and the HSIC block is only taken over once those four
+  values actually change. \"echo 0 > kcal_enable\" always restores full
+  ROM control."
+else
+  COLOUR_TITLE="KCal-free"
+  COLOUR_SECTION="Colour control: nothing in the kernel - LiveDisplay / the ROM owns
+  the PCC and HSIC blocks."
+fi
+
 cat > "$STAGE/README.txt" <<EOF
-DOOM Kernel — miatoll AnyKernel3 flashable ZIP (KCal-free)
+DOOM Kernel — miatoll AnyKernel3 flashable ZIP ($COLOUR_TITLE)
 =================================================
 Kernel source commit: $SOURCE_SHA
 Toolchain: upstream LLVM/Clang/LLD 22.1.8 (LLVM=1 LLVM_IAS=1)
@@ -208,6 +231,8 @@ What this ZIP does:
   - Flashes a matching dtbo.img (4 overlays, page size 4096).
   - Preserves the existing boot ramdisk. No Magisk/KernelSU module is installed.
   - Device check restricts installation to miatoll/curtana/joyeuse/excalibur/gram.
+
+$COLOUR_SECTION
 
 What this ZIP does NOT do:
   - It does not flash a ROM, recovery, vbmeta, or modem.

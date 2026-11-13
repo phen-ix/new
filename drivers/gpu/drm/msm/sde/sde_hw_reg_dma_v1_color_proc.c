@@ -1053,7 +1053,13 @@ void reg_dmav1_setup_dspp_pccv4(struct sde_hw_dspp *ctx, void *cfg)
 	if (rc)
 		DRM_ERROR("failed to kick off ret %d\n", rc);
 
-	if (kcal->enabled)
+	/*
+	 * Only take the HSIC block over when KCAL actually has HSIC values to
+	 * apply; otherwise the ROM's own HSIC programming (LiveDisplay) stays
+	 * in effect. Returning early in reg_dmav1_setup_dspp_pa_hsicv17()
+	 * for every enabled KCAL config is what used to blank LiveDisplay.
+	 */
+	if (kcal->enabled && sde_hw_kcal_hsic_active())
 		reg_dmav1_setup_dspp_pa_hsicv17_kcal(ctx, hw_cfg->ctl);
 exit:
 	kfree(data);
@@ -1178,7 +1184,8 @@ void reg_dmav1_setup_dspp_pa_hsicv17(struct sde_hw_dspp *ctx, void *cfg)
 	u32 opcode = 0;
 	int rc;
 
-	if (kcal->enabled)
+	/* KCAL owns HSIC only while it has non-neutral values to apply. */
+	if (kcal->enabled && sde_hw_kcal_hsic_active())
 		return;
 
 	opcode = SDE_REG_READ(&ctx->hw, ctx->cap->sblk->hsic.base);

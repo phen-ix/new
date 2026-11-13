@@ -43,6 +43,19 @@ struct sde_hw_kcal *sde_hw_kcal_get(void)
 	return &kcal_lut_data;
 }
 
+bool sde_hw_kcal_hsic_active(void)
+{
+	struct sde_hw_kcal_hsic *hsic = &kcal_lut_data.hsic;
+
+	if (!kcal_lut_data.enabled)
+		return false;
+
+	return hsic->hue != SDE_HW_KCAL_INIT_HUE ||
+	       hsic->saturation != SDE_HW_KCAL_INIT_ADJ ||
+	       hsic->value != SDE_HW_KCAL_INIT_ADJ ||
+	       hsic->contrast != SDE_HW_KCAL_INIT_ADJ;
+}
+
 struct drm_msm_pa_hsic sde_hw_kcal_hsic_struct(void)
 {
 	return (struct drm_msm_pa_hsic) {
