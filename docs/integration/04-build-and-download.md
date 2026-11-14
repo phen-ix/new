@@ -1,191 +1,120 @@
 # Build and download DOOM Kernel for miatoll
 
-## Which source to use
+## What a build produces
 
-- Repository: `phen-ix/kernel`
-- Branch: **`arena/2197b6cf-kernel`**
-- KCal removal commit: **`21eacd34b`** (or a later commit on this branch)
-- Defconfig: `vendor/xiaomi/miatoll_defconfig`
-- Toolchain: pinned Android **Clang/LLD 18.0.1**, `LLVM=1 LLVM_IAS=1`
-- KCal: **removed**. Uclamp, xxBackslashKSU, BBRv3, schedtune, and MSM display
-  support are retained.
-
-Do not select the original `16` branch when you want these integration
-changes. Do not download the older run **41169050563**: it passed, but it
-built commit `72ccb7e1d`, which still contained KCal.
-
-## Option A — compile with GitHub Actions
-
-The workflow is `.github/workflows/miatoll-kernel.yml`, displayed as
-**DOOM Kernel — miatoll (Clang 18)**. A push to `arena/2197b6cf-kernel` starts it
-automatically. It fetches and checks the pinned toolchain, builds the device
-defconfig, checks required features and KCal absence, audits compiler/linker
-commands, and uploads the outputs and logs.
-
-### Start or find a build in the browser
-
-1. Open <https://github.com/phen-ix/kernel/actions/workflows/miatoll-kernel.yml>.
-2. Select a **completed, successful** run on `arena/2197b6cf-kernel` whose
-   commit includes `21eacd34b`. Check the run's commit SHA, not just its name.
-3. To request another build, use **Run workflow** and select
-   `arena/2197b6cf-kernel`, if the branch selector is available. Alternatively,
-   push a commit to that branch; no source change is needed to follow the
-   automatic run already started by the removal push.
-4. Wait for the **build** job to finish with a green check. The first
-   toolchain download can take several minutes; a cache hit is faster.
-5. In the run's **Artifacts** section, download:
-
-   ```text
-   DOOM-Kernel-miatoll-raw-<full-commit-sha>
-   ```
-
-GitHub downloads this as a ZIP. Inside it are `artifacts/` and `logs/`.
-Artifacts are retained for **14 days**. A newer push to the same branch can
-cancel an older in-progress run because the workflow uses concurrency
-cancellation; use the run for the commit you actually want.
-
-### Download with GitHub CLI
-
-Install and authenticate GitHub CLI (`gh auth login`) on your computer.
-Replace `RUN_ID` with the number in the successful run's URL.
-
-```bash
-REPO=phen-ix/kernel
-RUN_ID=<successful-run-id>
-
-# Check the branch, exact source commit, and conclusion before downloading.
-gh run view "$RUN_ID" --repo "$REPO" \
-  --json headBranch,headSha,status,conclusion,url
-
-gh run watch "$RUN_ID" --repo "$REPO" --exit-status
-
-SHA="$(gh run view "$RUN_ID" --repo "$REPO" --json headSha --jq '.headSha')"
-gh run download "$RUN_ID" --repo "$REPO" \
-  --name "DOOM-Kernel-miatoll-raw-$SHA" \
-  --dir ./miatoll-no-kcal
-
-cd miatoll-no-kcal/artifacts
-sha256sum -c SHA256SUMS
-
-# KCal must be absent; the normal MSM display driver must remain enabled.
-if grep -q '^CONFIG_DRM_MSM_KCAL_CTRL=' miatoll.config; then
-  echo 'ERROR: this is not a KCal-free config' >&2
-  exit 1
-fi
-grep '^CONFIG_DRM_MSM=y' miatoll.config
-```
-
-To request a manual run from the CLI, explicitly select the working branch:
-
-```bash
-gh workflow run miatoll-kernel.yml \
-  --repo phen-ix/kernel \
-  --ref arena/2197b6cf-kernel
-
-gh run list --repo phen-ix/kernel \
-  --workflow miatoll-kernel.yml \
-  --branch arena/2197b6cf-kernel --limit 5
-```
-
-The repository's default branch is `16`; selecting the working branch is
-important. If the manual-run control is unavailable in your GitHub UI, use
-the automatic push-triggered run instead.
-
-## Option B — compile locally on Linux x86-64
-
-Ubuntu 22.04 x86-64 is the CI environment. The fetched compiler and host
-tools are Linux prebuilts; use a Linux machine or WSL2, not a native Windows
-shell. Keep several GB of disk space available for the toolchain and output.
-
-Install the host dependencies (this does not select GCC as the compiler):
-
-```bash
-sudo apt-get update
-sudo apt-get install -y \
-  git curl ca-certificates xz-utils tar gzip make python3 \
-  libssl-dev libelf-dev cpio bc bison flex
-```
-
-Fetch the correct branch and run the two checked build scripts:
-
-```bash
-git clone --single-branch --branch arena/2197b6cf-kernel \
-  https://github.com/phen-ix/kernel.git kernel-no-kcal
-cd kernel-no-kcal
-
-./scripts/fetch-llvm.sh
-./scripts/build-miatoll.sh
-```
-
-If the checkout already exists:
-
-```bash
-cd kernel-no-kcal
-git fetch origin arena/2197b6cf-kernel
-git switch arena/2197b6cf-kernel
-git pull --ff-only origin arena/2197b6cf-kernel
-./scripts/fetch-llvm.sh
-./scripts/build-miatoll.sh
-```
-
-The scripts put the pinned toolchain in `.work/`, build out-of-tree in
-`out/miatoll/`, and collect downloads in:
+Exactly one deliverable, ready to flash:
 
 ```text
-out/miatoll/artifacts/
-out/miatoll/logs/
+DOOM-Kernel-miatoll-<short-sha>.zip      AnyKernel3 flashable ZIP (recovery)
 ```
 
-For a completely fresh kernel output without deleting the toolchain:
+There is **one** build configuration. Kernel-level colour calibration (KCal) is
+always compiled in; which colour-block owner is active on the device is chosen
+**while flashing** (see *Colour control* below), so there is no second
+"KCal-free" variant to pick between and no mismatched pair of downloads.
+
+GitHub wraps everything uploaded through *workflow artifacts* in another ZIP, so
+a flashable ZIP published that way arrives zipped twice. The workflow therefore
+publishes the ZIP as a **release asset**, which is served as-is.
+
+## Option A — download the newest build
+
+Every successful push to the working branch publishes to one rolling release,
+which holds **one asset: the newest flashable ZIP**.
+
+- Release page: <https://github.com/phen-ix/new/releases/tag/ci-latest>
+- Direct file: `https://github.com/phen-ix/new/releases/download/ci-latest/DOOM-Kernel-miatoll-<short-sha>.zip`
+
+With GitHub CLI:
+
+```bash
+gh release view ci-latest --repo phen-ix/new
+gh release download ci-latest --repo phen-ix/new --pattern '*.zip' --dir .
+```
+
+The release notes carry the exact source commit and the SHA-256 of the asset.
+To verify:
+
+```bash
+sha256sum DOOM-Kernel-miatoll-<short-sha>.zip
+```
+
+The build is described in `.github/workflows/miatoll-kernel.yml`
+(**DOOM Kernel — miatoll (Clang 22)**). A push to the working branch starts it
+automatically; **Run workflow** starts it by hand. It fetches and verifies the
+pinned toolchain, builds `vendor/xiaomi/miatoll_defconfig`, checks the required
+features, audits compiler/linker commands, packages the ZIP and publishes it.
+A newer push cancels an in-progress run through concurrency cancellation, so use
+the run for the commit you actually want.
+
+## Option B — build locally
+
+Host packages: `bc bison flex libssl-dev libelf-dev cpio curl git xz-utils python3`.
+
+```bash
+scripts/fetch-llvm.sh        # pinned LLVM/Clang/LLD 22.1.8, checksum verified
+scripts/build-miatoll.sh     # kernel + dtbs + modules under out/miatoll/
+scripts/package-anykernel.sh # out/miatoll/anykernel/DOOM-Kernel-miatoll-<sha>.zip
+```
+
+Useful overrides:
 
 ```bash
 OUT_DIR="$PWD/out/miatoll-fresh" ./scripts/build-miatoll.sh
 ```
 
-That command's artifacts and logs are under `out/miatoll-fresh/` instead.
 Do not work around a compilation error by disabling a required feature.
 
-## Option C — AnyKernel3 flashable ZIP
-
-A recovery-flashable AnyKernel3 ZIP is produced from the same verified
-artifacts. GitHub Actions uploads it as a separate artifact:
+## Inside the ZIP
 
 ```text
-DOOM-Kernel-miatoll-<full-commit-sha>
+anykernel.sh                        installer (device check + flash-time choice)
+Image                               ARM64 kernel (KCal compiled in)
+dtb                                 cust-atoll-ab.dtb
+dtbo.img                            4 overlays, page size 4096
+tools/                              AnyKernel3 (pinned 41f04bd) + busybox/magiskboot
+META-INF/                           recovery entry point
+README.txt, PACKAGE_INFO.txt        build identity and instructions
 ```
 
-To build it locally after `scripts/build-miatoll.sh`:
+The ZIP targets the unified **miatoll** devices (`curtana`, `joyeuse`,
+`excalibur`, `gram`) using the device tree's boot layout: **A-only**, boot header
+**v2**, page size **4096**, **DTB in boot**, **separate DTBO partition**. It
+replaces the kernel and DTB inside the existing boot image, preserves the current
+boot ramdisk, and flashes a matching `dtbo.img`. It does not flash a ROM,
+recovery, vbmeta, or modem, and it does not install the optional `tcp_bic.ko` /
+`tcp_htcp.ko` modules. NoMount kernel support is built in (protocol 23), but the
+matching NoMount v2.3.0 userspace metamodule must be installed separately through
+the KernelSU manager after boot.
+
+## Colour control: the flash-time choice
+
+AOSP ROMs hand LiveDisplay picture adjustment to the same DSPP PA/HSIC block that
+KCal drives, and that block has a single writer: whichever side programs it last
+wins. The installer therefore asks, before it unpacks the boot image:
+
+| key | meaning |
+| --- | --- |
+| **VOL UP** | KCal **on** — KCal drives hue / saturation / value / contrast |
+| **VOL DOWN** | KCal **off** — the ROM keeps the block, LiveDisplay behaves like stock |
+| no key within 10 s | KCal **off** (the safe answer) |
+
+Recoveries without `getevent`/`timeout` fall back to the default; create
+`/sdcard/doom_kcal_on` before flashing to force KCal on in that case.
+
+The answer is written into the boot image command line as `doom.kcal=0|1`. The
+kernel reads it in `__setup()` before any display code runs, so it applies from
+the first frame, persists across reboots, and is rewritten on every flash — a
+reflash can never resurrect a stale value.
+
+Check after booting:
 
 ```bash
-./scripts/package-anykernel.sh
+su -c 'grep -o "doom.kcal=[01]" /proc/cmdline'
+su -c 'dmesg | grep "KCAL: boot default"'
+su -c 'cat /sys/devices/platform/kcal_ctrl.0/kcal_enable'
 ```
 
-Output:
-
-```text
-out/miatoll/anykernel/DOOM-Kernel-miatoll-<short-sha>.zip
-out/miatoll/anykernel/DOOM-Kernel-miatoll-<short-sha>.zip.sha256
-```
-
-The ZIP is configured for the unified **miatoll** target
-(`curtana`, `joyeuse`, `excalibur`, `gram`) using the device tree's boot
-layout: **A-only**, boot header **v2**, page size **4096**, **DTB in boot**,
-and a **separate DTBO partition**. It replaces the kernel and DTB inside the
-existing boot image, preserves the current boot ramdisk, and flashes a
-matching `dtbo.img` built from the four device overlays. It does not flash a
-ROM, recovery, vbmeta, or modem, and it does not install the optional
-`tcp_bic.ko` / `tcp_htcp.ko` modules. NoMount kernel support is built in
-(protocol 23), but the matching NoMount v2.3.0 userspace metamodule must be
-installed separately through the KernelSU manager after boot.
-
-The `kcal` ZIP asks, while flashing, who owns the DSPP PA/HSIC colour block:
-`VOL UP` = KCal on, `VOL DOWN` = KCal off, and no key within 10 s falls back to
-KCal off (also selectable by creating `/sdcard/doom_kcal_on` before flashing,
-for recoveries without `getevent`). The answer is written to the boot image
-command line as `doom.kcal=0|1`, which the kernel reads in `__setup()` before
-any display code runs, so it survives reboots and is rewritten on every flash.
-AOSP ROMs hand picture adjustment to that same block and it has a single
-writer, so KCal off means LiveDisplay behaves exactly like a stock kernel.
 Switch at runtime without reflashing:
 
 ```bash
@@ -193,44 +122,32 @@ echo 1 > /sys/devices/platform/kcal_ctrl.0/kcal_enable   # KCal on
 echo 0 > /sys/devices/platform/kcal_ctrl.0/kcal_enable   # ROM owns colour
 ```
 
-Verify the package before flashing:
+The remaining nodes are `kcal` (`"R G B"` gains, 256 = neutral), `kcal_min`
+(minimum gain, 20), `kcal_hue`, `kcal_sat`, `kcal_val` and `kcal_cont`. The
+platform device registers as id 0, hence the `.0` suffix.
 
-```bash
-cd out/miatoll/anykernel
-sha256sum -c DOOM-Kernel-miatoll-<short-sha>.zip.sha256
-```
+## Local raw outputs (not published)
 
-Flash from a custom recovery (TWRP/OrangeFox/Lineage Recovery). Keep a
-known-good `boot.img` and `dtbo.img` backup first. This is a testing build,
-not a runtime-certified release; compilation and ZIP structure checks do not
-prove that the device will boot or that Android 17 userspace will work
-correctly.
-
-## What the raw download contains
+`scripts/build-miatoll.sh` also leaves the raw, *non*-flashable outputs for
+inspection; they are not uploaded by CI because the flashable ZIP is the only
+deliverable:
 
 ```text
-artifacts/
-  Image                         raw ARM64 kernel image
-  cust-atoll-ab.dtb              device-tree blob
-  *-atoll-ab-idp-overlay.dtbo    curtana/excalibur/gram/joyeuse overlays
-  *.ko                          configured loadable modules, if any
-  miatoll.config                final resolved kernel configuration
-  SHA256SUMS                    relative-path checksums for verification
-  BUILD_INFO.txt                source/toolchain/feature identification
-logs/
-  toolchain.txt
-  defconfig.log
-  config-validation.log
-  build.log
-  tool-audit.log
+out/miatoll/artifacts/
+  Image                        raw ARM64 kernel image
+  cust-atoll-ab.dtb            device-tree blob
+  *-atoll-ab-idp-overlay.dtbo  curtana/excalibur/gram/joyeuse overlays
+  miatoll.config               the final .config
+  BUILD_INFO.txt               commit, toolchain, feature inventory
+  SHA256SUMS
+out/miatoll/logs/              defconfig, build, config-validation, toolchain
 ```
 
-**The raw artifact above is not a flashable AnyKernel ZIP, `boot.img`, or
-recovery ZIP.** Do not flash the raw `Image` directly to a boot partition.
-Use the AnyKernel3 package from Option C for recovery flashing, or your
-known-good ROM/kernel packaging flow. Keep a recovery image and boot/dtbo
-backups before testing.
+Verify the local artifact set with `(cd out/miatoll/artifacts && sha256sum -c SHA256SUMS)`.
 
-A successful compile/config/tool audit does not prove boot stability,
-Android 17 compatibility, root behavior, scheduler behavior, or BBRv3 runtime
-performance. Those still require on-device validation.
+## Flash and limitations
+
+Flash from a custom recovery (TWRP/OrangeFox/Lineage Recovery). Keep a known-good
+`boot.img` and `dtbo.img` backup first. This is a testing build, not a
+runtime-certified release; compilation and ZIP structure checks do not prove that
+the device will boot or that Android 17 userspace will work correctly.

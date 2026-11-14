@@ -109,9 +109,16 @@ The build validator now rejects an enabled KCal option and still requires
 rather than treating an old KCal-containing output directory as current.
 
 The earlier KCal-enabled build and its successful GitHub Actions run remain
-historical evidence only. Do not use those older artifacts when a KCal-free
-kernel is required. See `04-build-and-download.md` for current build/download
-instructions and artifact identification.
+historical evidence only. See `04-build-and-download.md` for current
+build/download instructions.
+
+**Superseded (2026-11-14):** the KCal-free variant is retired. There is a single
+build, and it always carries KCal — field testing showed the AOSP LiveDisplay
+Picture-adjustment HAL and KCal program the same DSPP PA/HSIC block with a single
+writer, so the owner is chosen at flash time with the volume keys and stored in
+the boot image command line as `doom.kcal=0|1`. The KCal-free sections below and
+under `docs/integration/evidence/phase2-*` are kept as history, not as current
+instructions.
 
 ## Verification status — KCal-free build (local, 2026-10-31)
 

@@ -5,20 +5,10 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# Two artifacts come out of this tree: "nocal" (KCal compiled out, the
-# default) and "kcal" (kernel-level colour calibration enabled). Select with
-# VARIANT=kcal|nocal; the config difference is CONFIG_DRM_MSM_KCAL_CTRL only.
-VARIANT="${VARIANT:-nocal}"
-case "$VARIANT" in
-  nocal) KCAL=0 ;;
-  kcal)  KCAL=1 ;;
-  *) echo "ERROR: VARIANT must be 'nocal' or 'kcal', got '$VARIANT'" >&2; exit 1 ;;
-esac
-if [[ "$KCAL" == 1 ]]; then
-  OUT_DIR="${OUT_DIR:-$ROOT/out/miatoll-kcal}"
-else
-  OUT_DIR="${OUT_DIR:-$ROOT/out/miatoll}"
-fi
+# One artifact comes out of this tree: kernel-level colour calibration (KCal)
+# is always compiled in. Which colour block owner is active at runtime is a
+# flash-time choice (see scripts/package-anykernel.sh), not a build variant.
+OUT_DIR="${OUT_DIR:-$ROOT/out/miatoll}"
 TOOLCHAIN_ROOT="${TOOLCHAIN_ROOT:-$ROOT/.work/toolchain}"
 BUILDTOOLS_ROOT="${BUILDTOOLS_ROOT:-$ROOT/.work/build-tools}"
 CLANG_DIR="$TOOLCHAIN_ROOT/llvm-22.1.8"
@@ -66,15 +56,9 @@ fi
 
 make -C "$ROOT" "${MAKE_ARGS[@]}" "$DEFCONFIG" 2>&1 | tee "$LOG_DIR/defconfig.log"
 
-# The variant is decided here, not by whoever edits the defconfig: KCal is
-# force-disabled for the nocal artifact and force-enabled for the kcal one,
-# then olddefconfig re-resolves the rest.
-if [[ "$KCAL" == 1 ]]; then
-  KCAL_FLAG=--enable
-else
-  KCAL_FLAG=--disable
-fi
-"$ROOT/scripts/config" --file "$OUT_DIR/.config" "$KCAL_FLAG" DRM_MSM_KCAL_CTRL \
+# The symbol is decided here, not by whoever edits the defconfig, then
+# olddefconfig re-resolves the rest.
+"$ROOT/scripts/config" --file "$OUT_DIR/.config" --enable DRM_MSM_KCAL_CTRL \
   | tee -a "$LOG_DIR/defconfig.log"
 make -C "$ROOT" "${MAKE_ARGS[@]}" olddefconfig 2>&1 | tee -a "$LOG_DIR/defconfig.log"
 
@@ -100,10 +84,8 @@ required_configs=(
   CONFIG_KEYS=y
   CONFIG_WIREGUARD=y
   CONFIG_NOMOUNT=y
+  CONFIG_DRM_MSM_KCAL_CTRL=y
 )
-if [[ "$KCAL" == 1 ]]; then
-  required_configs+=(CONFIG_DRM_MSM_KCAL_CTRL=y)
-fi
 for cfg in "${required_configs[@]}"; do
   if ! grep -qxF "$cfg" "$OUT_DIR/.config"; then
     echo "ERROR: required config missing: $cfg" \
@@ -116,10 +98,6 @@ done
 # boot-verified sm6250 reference; they are not required for this target.
 if grep -qE '^(CONFIG_RT_GROUP_SCHED|CONFIG_CFS_BANDWIDTH|CONFIG_MEMCG_SWAP)=y' "$OUT_DIR/.config"; then
   echo "ERROR: unexpected optional group scheduler/swap config" >&2
-  exit 1
-fi
-if [[ "$KCAL" == 0 ]] && grep -q '^CONFIG_DRM_MSM_KCAL_CTRL=' "$OUT_DIR/.config"; then
-  echo "ERROR: KCal must remain removed from the nocal build" >&2
   exit 1
 fi
 # NoMount wire protocol is part of the user/kernel ABI. The v2.3.0 metamodule
@@ -138,7 +116,7 @@ WIREGUARD_VERSION="$(sed -n 's/^#define WIREGUARD_VERSION "\(.*\)"$/\1/p' "$ROOT
   echo "ERROR: could not read WIREGUARD_VERSION from drivers/net/wireguard/version.h" >&2
   exit 1
 }
-echo "Required config validation passed; variant=$VARIANT; KCal $([[ $KCAL == 1 ]] && echo present || echo absent); MSM retained; NoMount protocol 23; Android 17 cgroup controllers enabled; default TCP congestion control bbr3." | tee "$LOG_DIR/config-validation.log"
+echo "Required config validation passed; KCal present; MSM retained; NoMount protocol 23; Android 17 cgroup controllers enabled; default TCP congestion control bbr3." | tee "$LOG_DIR/config-validation.log"
 
 set +e
 make -C "$ROOT" "${MAKE_ARGS[@]}" -j"$(nproc)" Image dtbs modules \
@@ -194,15 +172,11 @@ cp "$OUT_DIR/arch/arm64/boot/dts/qcom/"*.dtb "$ARTIFACT_DIR/" 2>/dev/null || tru
 cp "$OUT_DIR/arch/arm64/boot/dts/qcom/"*.dtbo "$ARTIFACT_DIR/" 2>/dev/null || true
 find "$OUT_DIR" -path "$ARTIFACT_DIR" -prune -o -name '*.ko' -exec cp {} "$ARTIFACT_DIR/" \;
 
-# Do not identify a downloadable kernel as KCal-free merely because its
-# defconfig request was removed: check the actually linked symbol table too.
+# Check the linked symbol table, not just the config: a symbol that was
+# requested but never linked would ship an image whose colour nodes are absent.
 kcalsyms="$(grep -Ec ' (sde_hw_kcal_|sde_cp_kcal_|kcal_force_update)' "$OUT_DIR/System.map" || true)"
-if [[ "$KCAL" == 0 && "$kcalsyms" != 0 ]]; then
-  echo "ERROR: KCal symbols remain in the linked nocal kernel ($kcalsyms found)" >&2
-  exit 1
-fi
-if [[ "$KCAL" == 1 && "$kcalsyms" == 0 ]]; then
-  echo "ERROR: KCal symbols missing from the linked kcal kernel" >&2
+if [[ "$kcalsyms" == 0 ]]; then
+  echo "ERROR: KCal symbols missing from the linked kernel" >&2
   exit 1
 fi
 
@@ -215,8 +189,7 @@ fi
   echo "BUILD_FLAGS=ARCH=arm64 SUBARCH=arm64 LLVM=1 LLVM_IAS=1"
   echo "RUNTIME_TESTED=no"
   echo "OUTPUT_TYPE=raw Image, DTB/DTBO, modules and config; NOT a flashable boot image"
-  echo "VARIANT=$VARIANT"
-  echo "KCAL=$([[ $KCAL == 1 ]] && echo present || echo absent)"
+  echo "KCAL=present"
   echo "NOMOUNT_PROTOCOL=23"
   echo "WIREGUARD_VERSION=$WIREGUARD_VERSION"
   echo "KSU_VERSION=$(sed -n 's/.*-DKSU_VERSION=\([0-9]*\).*/\1/p' "$ROOT/drivers/kernelsu/Makefile" | head -1)"

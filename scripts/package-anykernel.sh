@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Package the verified miatoll kernel artifacts into an AnyKernel3 flashable ZIP.
 #
-# Inputs:  out/miatoll{,-kcal}/artifacts/{Image,cust-atoll-ab.dtb,*.dtbo,...}
-# Output:  out/miatoll{,-kcal}/anykernel/DOOM-Kernel-miatoll[-kcal]-<short-sha>.zip
+# Inputs:  out/miatoll/artifacts/{Image,cust-atoll-ab.dtb,*.dtbo,...}
+# Output:  out/miatoll/anykernel/DOOM-Kernel-miatoll-<short-sha>.zip
+#
+# One build, one deliverable: the ZIP produced here is the file you flash.
 #
 # Device layout (mi-atoll/device_xiaomi_miatoll @ 17-volt, BoardConfig.mk):
 #   A-only (AB_OTA_UPDATER := false), boot header v2, page size 4096,
@@ -13,13 +15,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VARIANT="${VARIANT:-nocal}"
-case "$VARIANT" in
-  nocal) DEFAULT_OUT="$ROOT/out/miatoll" ;;
-  kcal)  DEFAULT_OUT="$ROOT/out/miatoll-kcal" ;;
-  *) echo "ERROR: VARIANT must be 'nocal' or 'kcal', got '$VARIANT'" >&2; exit 1 ;;
-esac
-OUT_DIR="${OUT_DIR:-$DEFAULT_OUT}"
+OUT_DIR="${OUT_DIR:-$ROOT/out/miatoll}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-$OUT_DIR/artifacts}"
 AK_OUT="$OUT_DIR/anykernel"
 WORK="$ROOT/.work/anykernel-package"
@@ -45,32 +41,16 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 [[ -f "$ARTIFACT_DIR/miatoll.config" ]] || die "Missing miatoll.config"
 [[ -f "$ARTIFACT_DIR/BUILD_INFO.txt" ]] || die "Missing BUILD_INFO.txt"
 
-# The packaged config must match the variant this script was asked to package:
-# BUILD_INFO is written by the build, so a swapped artifact directory is caught.
-INFO_VARIANT="$(sed -n 's/^VARIANT=//p' "$ARTIFACT_DIR/BUILD_INFO.txt" | head -1)"
-[[ -z "$INFO_VARIANT" || "$INFO_VARIANT" == "$VARIANT" ]] \
-  || die "BUILD_INFO says VARIANT=$INFO_VARIANT but this run is VARIANT=$VARIANT"
-if [[ "$VARIANT" == nocal ]]; then
-  if grep -q '^CONFIG_DRM_MSM_KCAL_CTRL=' "$ARTIFACT_DIR/miatoll.config"; then
-    die "KCal is enabled in miatoll.config; the nocal package must not carry it"
-  fi
-else
-  grep -q '^CONFIG_DRM_MSM_KCAL_CTRL=y' "$ARTIFACT_DIR/miatoll.config" \
-    || die "CONFIG_DRM_MSM_KCAL_CTRL=y not found; the kcal package needs it"
-fi
+# The packaged kernel must carry KCal: the installer offers the flash-time
+# colour choice, and that choice is meaningless without the driver.
+grep -q '^CONFIG_DRM_MSM_KCAL_CTRL=y' "$ARTIFACT_DIR/miatoll.config" \
+  || die "CONFIG_DRM_MSM_KCAL_CTRL=y not found in miatoll.config"
 grep -q '^CONFIG_DRM_MSM=y' "$ARTIFACT_DIR/miatoll.config" || die "CONFIG_DRM_MSM=y not found"
 grep -q '^CONFIG_NOMOUNT=y' "$ARTIFACT_DIR/miatoll.config" || die "CONFIG_NOMOUNT=y not found"
 grep -q '^CONFIG_KSU=y' "$ARTIFACT_DIR/miatoll.config" || die "CONFIG_KSU=y not found"
 grep -q '^CONFIG_MEMCG=y' "$ARTIFACT_DIR/miatoll.config" || die "CONFIG_MEMCG=y not found"
 grep -q '^CONFIG_FAIR_GROUP_SCHED=y' "$ARTIFACT_DIR/miatoll.config" || die "CONFIG_FAIR_GROUP_SCHED=y not found"
 
-if [[ "$VARIANT" == kcal ]]; then
-  VARIANT_LABEL="KCal"
-  ZIP_TAG="-kcal"
-else
-  VARIANT_LABEL="KCal-free"
-  ZIP_TAG=""
-fi
 
 for f in "${DTBO_FILES[@]}"; do
   [[ -f "$ARTIFACT_DIR/$f" ]] || die "Missing DTBO: $f"
@@ -132,12 +112,12 @@ cp "$WORK/dtbo.img" "$STAGE/dtbo.img"
 
 # Device-specific installer script.
 cat > "$STAGE/anykernel.sh" <<'EOF'
-### DOOM Kernel — AnyKernel3 installer for miatoll (Clang 22, variant placeholder)
+### DOOM Kernel — AnyKernel3 installer for miatoll (Clang 22, KCal)
 ## Device: Xiaomi Redmi Note 9 Pro / 9S / 9 Pro Max / Poco M2 Pro (miatoll)
 ## Layout: A-only, boot header v2, DTB-in-boot, separate DTBO partition.
 
 properties() { '
-kernel.string=DOOM Kernel | miatoll (Clang 22, __VARIANT__)
+kernel.string=DOOM Kernel | miatoll (Clang 22, KCal)
 do.devicecheck=1
 do.modules=0
 do.systemless=0
@@ -166,36 +146,12 @@ PATCH_VBMETA_FLAG=0;
 
 ui_print "Installing DOOM Kernel for miatoll";
 
-# __KCAL_CHOICE__
-
-dump_boot;
-
-# __KCAL_PATCH__
-
-write_boot;
-### end install
-EOF
-sed -i "s/__VARIANT__/$VARIANT_LABEL/" "$STAGE/anykernel.sh"
-grep -q "kernel.string=DOOM Kernel | miatoll (Clang 22, $VARIANT_LABEL)" "$STAGE/anykernel.sh" \
-  || die "installer string placeholder was not substituted"
-
-# ---------------------------------------------------------------------------
-# Boot-time KCal choice.
-#
-# AOSP ROMs give picture adjustment to the same DSPP PA/HSIC block KCal drives
-# and the block has one writer, so the user picks the owner while flashing and
-# the answer is written into the boot image cmdline (doom.kcal=0|1). The kernel
-# reads it in __setup() before any display code runs, and kcal_enable still
-# overrides it at runtime.
-# ---------------------------------------------------------------------------
-if [[ "$VARIANT" == kcal ]]; then
-  cat > "$WORK/kcal-choice.sh" <<'KCEOF'
-kcal_boot_on=0;
 ui_print " ";
 ui_print "  Colour control (KCal) - pick with the volume keys:";
 ui_print "    VOL UP   = KCal ON   (KCal drives hue / sat / val / contrast)";
 ui_print "    VOL DOWN = KCal OFF  (stock colour path, ROM LiveDisplay works)";
 ui_print "    no key within 10s -> KCal OFF (live toggle: echo 1 > .../kcal_enable)";
+kcal_boot_on=0;
 if [ -e /sdcard/doom_kcal_on ] || [ -e "$DIR/doom_kcal_on" ]; then
   kcal_boot_on=1;
   ui_print "  /sdcard/doom_kcal_on found -> KCal ON";
@@ -209,31 +165,26 @@ else
   ui_print "  getevent/timeout unavailable, using the default (KCal OFF)";
 fi;
 ui_print "  KCal at boot: $([ "$kcal_boot_on" = 1 ] && echo ON || echo OFF)";
-KCEOF
-  cat > "$WORK/kcal-patch.sh" <<'KPEOF'
+
+dump_boot;
+
 if [ "$kcal_boot_on" = 1 ]; then
   patch_cmdline "doom.kcal" "doom.kcal=1";
 else
   patch_cmdline "doom.kcal" "doom.kcal=0";
 fi;
 ui_print "  boot cmdline now carries doom.kcal=$kcal_boot_on";
-KPEOF
-else
-  printf '%s\n' 'ui_print "  This variant ships no KCal: stock colour path, LiveDisplay works.";' \
-    > "$WORK/kcal-choice.sh"
-  printf '%s\n' ':;' > "$WORK/kcal-patch.sh"
-fi
-sed -i -e "/^# __KCAL_CHOICE__\$/r $WORK/kcal-choice.sh" -e "/^# __KCAL_CHOICE__\$/d" "$STAGE/anykernel.sh"
-sed -i -e "/^# __KCAL_PATCH__\$/r $WORK/kcal-patch.sh" -e "/^# __KCAL_PATCH__\$/d" "$STAGE/anykernel.sh"
-if grep -q '__KCAL_CHOICE__\|__KCAL_PATCH__' "$STAGE/anykernel.sh"; then
-  die "KCal choice placeholders were not substituted"
-fi
+
+write_boot;
+### end install
+EOF
 bash -n "$STAGE/anykernel.sh" || die "generated anykernel.sh has a syntax error"
+
 
 # Build metadata for the flashable package.
 {
   echo "PROJECT=DOOM Kernel"
-  echo "PACKAGE=DOOM-Kernel-miatoll${ZIP_TAG}-${SHORT_SHA}"
+  echo "PACKAGE=DOOM-Kernel-miatoll-${SHORT_SHA}"
   echo "KERNEL_SOURCE_COMMIT=$SOURCE_SHA"
   echo "DEVICE=miatoll (curtana/joyeuse/excalibur/gram)"
   echo "ANDROID_TARGET=17 (VoltageOS 6.2)"
@@ -241,19 +192,17 @@ bash -n "$STAGE/anykernel.sh" || die "generated anykernel.sh has a syntax error"
   echo "ANYKERNEL3_COMMIT=$ANYKERNEL3_COMMIT"
   echo "LIBUFDT_COMMIT=$LIBUFDT_COMMIT"
   echo "DTBO_PAGE_SIZE=$DTBO_PAGE_SIZE"
-  echo "VARIANT=$VARIANT"
-  echo "KCAL=$([[ "$VARIANT" == kcal ]] && echo present || echo absent)"
+  echo "KCAL=present"
   echo "KSU_VERSION=$(sed -n 's/.*-DKSU_VERSION=\([0-9]*\).*/\1/p' "$ROOT/drivers/kernelsu/Makefile" | head -1)"
   echo "KSU_UAPI_VERSION=$(sed -n 's/^#define KERNEL_SU_UAPI_VERSION \([0-9]*\).*/\1/p' "$ROOT/drivers/kernelsu/include/uapi/supercall.h" | head -1)"
   echo "NOMOUNT_PROTOCOL=$(sed -n 's/^#define NOMOUNT_BASE_VERSION "\([0-9]*\)".*/\1/p' "$ROOT/fs/nomount/nomount.h" | head -1)"
   echo "NOMOUNT_UPSTREAM=maxsteeel/nomount v2.3.0"
   echo "RUNTIME_TESTED=no"
-  echo "MODULES_INCLUDED=no (tcp_bic/tcp_htcp remain optional raw artifacts)"
+  echo "MODULES_INCLUDED=no (tcp_bic/tcp_htcp are not built)"
 } > "$STAGE/PACKAGE_INFO.txt"
 
-if [[ "$VARIANT" == kcal ]]; then
-  COLOUR_TITLE="KCal"
-  COLOUR_SECTION="Colour control (KCal):
+COLOUR_TITLE="KCal"
+COLOUR_SECTION="Colour control (KCal):
   The installer asked you to pick with the volume keys and stored the answer
   in the boot image cmdline as doom.kcal=0|1. AOSP ROMs hand picture
   adjustment to the same DSPP PA/HSIC block KCal drives, and that block has a
@@ -281,11 +230,6 @@ if [[ "$VARIANT" == kcal ]]; then
   neutral defaults never changes what the ROM programmed. \"doom.kcal\" is read
   before any display code runs, so the choice survives reboots and OTA-free
   reflashes; the cmdline is rewritten on every flash of this ZIP."
-else
-  COLOUR_TITLE="KCal-free"
-  COLOUR_SECTION="Colour control: nothing in the kernel - LiveDisplay / the ROM owns
-  the PCC and HSIC blocks."
-fi
 
 cat > "$STAGE/README.txt" <<EOF
 DOOM Kernel — miatoll AnyKernel3 flashable ZIP ($COLOUR_TITLE)
@@ -300,6 +244,8 @@ What this ZIP does:
   - Flashes a matching dtbo.img (4 overlays, page size 4096).
   - Preserves the existing boot ramdisk. No Magisk/KernelSU module is installed.
   - Device check restricts installation to miatoll/curtana/joyeuse/excalibur/gram.
+  - Asks, with the volume keys, whether KCal owns the colour block and stores
+    that answer in the boot image cmdline (doom.kcal=0|1).
 
 $COLOUR_SECTION
 
@@ -322,7 +268,7 @@ stability-certified release.
 EOF
 
 # Create the ZIP (store updater-script uncompressed is not required; deflate all).
-ZIP_NAME="DOOM-Kernel-miatoll${ZIP_TAG}-${SHORT_SHA}.zip"
+ZIP_NAME="DOOM-Kernel-miatoll-${SHORT_SHA}.zip"
 ZIP_PATH="$AK_OUT/$ZIP_NAME"
 rm -f "$ZIP_PATH"
 (cd "$STAGE" && python3 - "$ZIP_PATH" <<'PY'

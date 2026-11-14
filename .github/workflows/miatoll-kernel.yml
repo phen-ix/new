@@ -9,28 +9,25 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  # Publishing the flashable ZIP as a release asset needs write access; the
+  # checkout itself stays read-only.
+  contents: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  TOOLCHAIN_ROOT: ${{ github.workspace }}/.work/toolchain
+  BUILDTOOLS_ROOT: ${{ github.workspace }}/.work/build-tools
+  # One build, one output directory: KCal is always compiled in and the
+  # colour-block owner is chosen at flash time.
+  OUT_DIR: ${{ github.workspace }}/out/miatoll
+
 jobs:
   build:
     runs-on: ubuntu-22.04
     timeout-minutes: 120
-    strategy:
-      # Both variants must be reported even if one of them fails.
-      fail-fast: false
-      matrix:
-        # nocal: KCal compiled out (the configuration XDA/most builds ship)
-        # kcal : CONFIG_DRM_MSM_KCAL_CTRL=y, kernel-level colour calibration
-        variant: [nocal, kcal]
-    env:
-      TOOLCHAIN_ROOT: ${{ github.workspace }}/.work/toolchain
-      BUILDTOOLS_ROOT: ${{ github.workspace }}/.work/build-tools
-      OUT_DIR: ${{ github.workspace }}/out/miatoll-${{ matrix.variant }}
-      VARIANT: ${{ matrix.variant }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -65,7 +62,7 @@ jobs:
         if: steps.cache-llvm.outputs.cache-hit != 'true'
         run: scripts/fetch-llvm.sh
 
-      - name: Build DOOM Kernel for miatoll (${{ matrix.variant }})
+      - name: Build DOOM Kernel for miatoll
         run: scripts/build-miatoll.sh
 
       # Run logs are not always downloadable from outside CI, so surface the
@@ -78,11 +75,11 @@ jobs:
             local log="$1" n="$2"
             if grep -qE 'error:|Error [0-9]|ERROR:' "$log"; then
               grep -E 'error:|Error [0-9]|ERROR:' "$log" | head -"$n" | while IFS= read -r l; do
-                echo "::error title=build($VARIANT)::$(printf '%s' "$l" | cut -c1-900)"
+                echo "::error title=build::$(printf '%s' "$l" | cut -c1-900)"
               done
             else
               tail -"$n" "$log" | while IFS= read -r l; do
-                echo "::error title=build($VARIANT)::$(printf '%s' "$l" | cut -c1-900)"
+                echo "::error title=build::$(printf '%s' "$l" | cut -c1-900)"
               done
             fi
           }
@@ -100,29 +97,59 @@ jobs:
               */config-validation.log) report "$f" 4 ;;
             esac
           done
-          [ "$found" = 1 ] || echo "::error title=build($VARIANT)::no logs were produced at all"
+          [ "$found" = 1 ] || echo "::error title=build::no logs were produced at all"
 
-      - name: Package DOOM Kernel AnyKernel3 ZIP (${{ matrix.variant }})
+      - name: Package the flashable AnyKernel3 ZIP
         run: scripts/package-anykernel.sh
 
-      - name: Upload DOOM Kernel raw build artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: DOOM-Kernel-miatoll-${{ matrix.variant }}-raw-${{ github.sha }}
-          path: |
-            ${{ env.OUT_DIR }}/artifacts/
-            ${{ env.OUT_DIR }}/logs/
-          if-no-files-found: warn
-          retention-days: 14
+      # The ZIP produced by the packaging step IS the deliverable. Artifacts are
+      # always re-zipped by GitHub, so a flashable ZIP published as an artifact
+      # arrives as a ZIP inside a ZIP; a release asset is served as-is.
+      - name: Publish the flashable ZIP as the only release asset
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag=ci-latest
+          zip="$(ls -t "$OUT_DIR"/anykernel/*.zip 2>/dev/null | head -1 || true)"
+          [ -f "$zip" ] || { echo "::error::no flashable ZIP was produced"; exit 1; }
+          asset="$(basename "$zip")"
+          sum="$(cut -d' ' -f1 "$zip.sha256")"
+          url="https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/$asset"
 
-      - name: Upload DOOM Kernel ZIP (${{ matrix.variant }})
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: DOOM-Kernel-miatoll-${{ matrix.variant }}-${{ github.sha }}
-          path: |
-            ${{ env.OUT_DIR }}/anykernel/*.zip
-            ${{ env.OUT_DIR }}/anykernel/*.zip.sha256
-          if-no-files-found: warn
-          retention-days: 14
+          {
+            echo "Automatic build of \`$GITHUB_SHA\`."
+            echo
+            echo "| file | sha256 |"
+            echo "| --- | --- |"
+            echo "| \`$asset\` | \`$sum\` |"
+            echo
+            echo "Direct download: <$url>"
+            echo
+            echo "Flash it from a custom recovery (TWRP / OrangeFox / Lineage"
+            echo "Recovery). The installer asks with the volume keys whether KCal"
+            echo "owns the DSPP colour block, then writes that answer into the boot"
+            echo "image cmdline as \`doom.kcal=0|1\`; no key within 10 s means KCal"
+            echo "off. See \`README.txt\` inside the ZIP for the runtime toggle."
+          } > "$RUNNER_TEMP/notes.md"
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release edit "$tag" --notes-file "$RUNNER_TEMP/notes.md"
+          else
+            gh release create "$tag" \
+              --title "DOOM Kernel — miatoll (newest build)" \
+              --notes-file "$RUNNER_TEMP/notes.md" --prerelease
+          fi
+
+          # Exactly one asset: drop whatever a previous commit left behind.
+          gh release view "$tag" --json assets --jq '.assets[].name' |
+            while IFS= read -r old; do
+              [ -z "$old" ] || [ "$old" = "$asset" ] ||
+                gh release delete-asset "$tag" "$old" --yes ||
+                echo "::warning title=release::could not delete stale asset $old"
+            done
+
+          gh release upload "$tag" "$zip" --clobber
+          echo "Published $asset ($sum)"
+          echo "::notice title=Download::$url"
