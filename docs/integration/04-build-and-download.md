@@ -178,6 +178,21 @@ ROM, recovery, vbmeta, or modem, and it does not install the optional
 (protocol 23), but the matching NoMount v2.3.0 userspace metamodule must be
 installed separately through the KernelSU manager after boot.
 
+The `kcal` ZIP asks, while flashing, who owns the DSPP PA/HSIC colour block:
+`VOL UP` = KCal on, `VOL DOWN` = KCal off, and no key within 10 s falls back to
+KCal off (also selectable by creating `/sdcard/doom_kcal_on` before flashing,
+for recoveries without `getevent`). The answer is written to the boot image
+command line as `doom.kcal=0|1`, which the kernel reads in `__setup()` before
+any display code runs, so it survives reboots and is rewritten on every flash.
+AOSP ROMs hand picture adjustment to that same block and it has a single
+writer, so KCal off means LiveDisplay behaves exactly like a stock kernel.
+Switch at runtime without reflashing:
+
+```bash
+echo 1 > /sys/devices/platform/kcal_ctrl.0/kcal_enable   # KCal on
+echo 0 > /sys/devices/platform/kcal_ctrl.0/kcal_enable   # ROM owns colour
+```
+
 Verify the package before flashing:
 
 ```bash

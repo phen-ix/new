@@ -38,6 +38,27 @@ static struct sde_hw_kcal kcal_lut_data = {
 	},
 };
 
+/*
+ * Boot-time default, chosen by the installer through the boot image command
+ * line (AnyKernel3 patches it while flashing):
+ *
+ *   doom.kcal=1   KCAL enabled at boot
+ *   doom.kcal=0   KCAL disabled at boot (stock colour path, LiveDisplay works)
+ *
+ * AOSP based ROMs hand picture adjustment to the same DSPP PA/HSIC block that
+ * KCAL drives, and the block has a single writer, so which one owns it has to
+ * be a conscious choice rather than a surprise. The choice is stored in the
+ * boot image, and kcal_enable still overrides it at runtime.
+ */
+static int __init doom_kcal_setup(char *str)
+{
+	kcal_lut_data.enabled = !!(str && str[0] != '0');
+	pr_info("KCAL: boot default from cmdline: %s\n",
+		kcal_lut_data.enabled ? "enabled" : "disabled");
+	return 1;
+}
+__setup("doom.kcal=", doom_kcal_setup);
+
 struct sde_hw_kcal *sde_hw_kcal_get(void)
 {
 	return &kcal_lut_data;

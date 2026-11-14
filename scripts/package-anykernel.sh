@@ -166,13 +166,69 @@ PATCH_VBMETA_FLAG=0;
 
 ui_print "Installing DOOM Kernel for miatoll";
 
+# __KCAL_CHOICE__
+
 dump_boot;
+
+# __KCAL_PATCH__
+
 write_boot;
 ### end install
 EOF
 sed -i "s/__VARIANT__/$VARIANT_LABEL/" "$STAGE/anykernel.sh"
 grep -q "kernel.string=DOOM Kernel | miatoll (Clang 22, $VARIANT_LABEL)" "$STAGE/anykernel.sh" \
   || die "installer string placeholder was not substituted"
+
+# ---------------------------------------------------------------------------
+# Boot-time KCal choice.
+#
+# AOSP ROMs give picture adjustment to the same DSPP PA/HSIC block KCal drives
+# and the block has one writer, so the user picks the owner while flashing and
+# the answer is written into the boot image cmdline (doom.kcal=0|1). The kernel
+# reads it in __setup() before any display code runs, and kcal_enable still
+# overrides it at runtime.
+# ---------------------------------------------------------------------------
+if [[ "$VARIANT" == kcal ]]; then
+  cat > "$WORK/kcal-choice.sh" <<'KCEOF'
+kcal_boot_on=0;
+ui_print " ";
+ui_print "  Colour control (KCal) - pick with the volume keys:";
+ui_print "    VOL UP   = KCal ON   (KCal drives hue / sat / val / contrast)";
+ui_print "    VOL DOWN = KCal OFF  (stock colour path, ROM LiveDisplay works)";
+ui_print "    no key within 10s -> KCal OFF (live toggle: echo 1 > .../kcal_enable)";
+if [ -e /sdcard/doom_kcal_on ] || [ -e "$DIR/doom_kcal_on" ]; then
+  kcal_boot_on=1;
+  ui_print "  /sdcard/doom_kcal_on found -> KCal ON";
+elif command -v getevent >/dev/null 2>&1 && command -v timeout >/dev/null 2>&1; then
+  ui_print "  waiting 10s for a volume key ...";
+  kcal_key=$(timeout 10 getevent -lq 2>/dev/null | grep -m1 -E 'KEY_VOLUMEUP|KEY_VOLUMEDOWN');
+  case "$kcal_key" in
+    *KEY_VOLUMEUP*) kcal_boot_on=1 ;;
+  esac;
+else
+  ui_print "  getevent/timeout unavailable, using the default (KCal OFF)";
+fi;
+ui_print "  KCal at boot: $([ "$kcal_boot_on" = 1 ] && echo ON || echo OFF)";
+KCEOF
+  cat > "$WORK/kcal-patch.sh" <<'KPEOF'
+if [ "$kcal_boot_on" = 1 ]; then
+  patch_cmdline "doom.kcal" "doom.kcal=1";
+else
+  patch_cmdline "doom.kcal" "doom.kcal=0";
+fi;
+ui_print "  boot cmdline now carries doom.kcal=$kcal_boot_on";
+KPEOF
+else
+  printf '%s\n' 'ui_print "  This variant ships no KCal: stock colour path, LiveDisplay works.";' \
+    > "$WORK/kcal-choice.sh"
+  printf '%s\n' ':;' > "$WORK/kcal-patch.sh"
+fi
+sed -i -e "/^# __KCAL_CHOICE__\$/r $WORK/kcal-choice.sh" -e "/^# __KCAL_CHOICE__\$/d" "$STAGE/anykernel.sh"
+sed -i -e "/^# __KCAL_PATCH__\$/r $WORK/kcal-patch.sh" -e "/^# __KCAL_PATCH__\$/d" "$STAGE/anykernel.sh"
+if grep -q '__KCAL_CHOICE__\|__KCAL_PATCH__' "$STAGE/anykernel.sh"; then
+  die "KCal choice placeholders were not substituted"
+fi
+bash -n "$STAGE/anykernel.sh" || die "generated anykernel.sh has a syntax error"
 
 # Build metadata for the flashable package.
 {
@@ -198,20 +254,33 @@ grep -q "kernel.string=DOOM Kernel | miatoll (Clang 22, $VARIANT_LABEL)" "$STAGE
 if [[ "$VARIANT" == kcal ]]; then
   COLOUR_TITLE="KCal"
   COLOUR_SECTION="Colour control (KCal):
-  Kernel-level calibration is exposed under
-    /sys/devices/platform/kcal_ctrl/kcal          \"R G B\" gains (256 = neutral)
-    /sys/devices/platform/kcal_ctrl/kcal_enable   1 = on, 0 = off
-    /sys/devices/platform/kcal_ctrl/kcal_min      minimum gain (20)
-    /sys/devices/platform/kcal_ctrl/kcal_hue      hue
-    /sys/devices/platform/kcal_ctrl/kcal_sat      saturation
-    /sys/devices/platform/kcal_ctrl/kcal_val      value
-    /sys/devices/platform/kcal_ctrl/kcal_cont     contrast
-  LiveDisplay / the ROM's colour management keeps working as long as the
-  KCAL hue/sat/val/cont values stay at their neutral defaults
-  (0 / 255 / 255 / 255): the PCC gains are multiplied into the ROM's own
-  coefficients, and the HSIC block is only taken over once those four
-  values actually change. \"echo 0 > kcal_enable\" always restores full
-  ROM control."
+  The installer asked you to pick with the volume keys and stored the answer
+  in the boot image cmdline as doom.kcal=0|1. AOSP ROMs hand picture
+  adjustment to the same DSPP PA/HSIC block KCal drives, and that block has a
+  single writer, so one of them has to own it:
+
+    KCal OFF (default)  the ROM keeps the block: LiveDisplay picture
+                        adjustment behaves exactly like a stock kernel.
+    KCal ON             KCal owns hue/sat/val/contrast; LiveDisplay picture
+                        adjustment is ignored until KCal goes back to neutral.
+
+  Nodes (the device name may carry a .0 suffix):
+    /sys/devices/platform/kcal_ctrl*/kcal          \"R G B\" gains (256 = neutral)
+    /sys/devices/platform/kcal_ctrl*/kcal_enable   1 = on, 0 = off
+    /sys/devices/platform/kcal_ctrl*/kcal_min      minimum gain (20)
+    /sys/devices/platform/kcal_ctrl*/kcal_hue      hue
+    /sys/devices/platform/kcal_ctrl*/kcal_sat      saturation
+    /sys/devices/platform/kcal_ctrl*/kcal_val      value
+    /sys/devices/platform/kcal_ctrl*/kcal_cont     contrast
+
+  Switch without reflashing:
+    echo 1 > /sys/devices/platform/kcal_ctrl.0/kcal_enable   # KCal on
+    echo 0 > /sys/devices/platform/kcal_ctrl.0/kcal_enable   # ROM owns colour
+
+  PCC gains are multiplied into the ROM's own coefficients, so KCal at its
+  neutral defaults never changes what the ROM programmed. \"doom.kcal\" is read
+  before any display code runs, so the choice survives reboots and OTA-free
+  reflashes; the cmdline is rewritten on every flash of this ZIP."
 else
   COLOUR_TITLE="KCal-free"
   COLOUR_SECTION="Colour control: nothing in the kernel - LiveDisplay / the ROM owns
