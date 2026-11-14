@@ -1,4 +1,6 @@
 # Kconfig for NoMount
+# Vendored from maxsteeel/nomount v2.3.0-720 (ab93ee32a589ccb021257b3c1f280e058520d844),
+# wire protocol / base version 23.
 
 config NOMOUNT
 	tristate "NoMount Path Redirection Subsystem"

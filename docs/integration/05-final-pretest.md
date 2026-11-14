@@ -9,7 +9,7 @@ runtime test has been performed on this tree.
 | Component | Pin | Version inside | Notes |
 |---|---|---|---|
 | xxKSU | `backslashxx/KernelSU` master `9b74de40162dea776d461c15946aae4064c85e5f` | `KSU_VERSION=32714`, UAPI `6` | Previous package was v3.3.1-32 / 32707. The v3.3.1-34 release tag itself peels to `74d0441924…` with ksuver 32713, while the release manager APK and current master are 32714; we pinned the master commit that matches the manager generation. |
-| NoMount | `maxsteeel/nomount` v2.2.0 `bf1847f98fed382369c43bfd652cd93774b9b8e3` | base/wire protocol `22` | User-selected stable implementation. Built into the kernel (`CONFIG_NOMOUNT=y`). The matching userspace metamodule `NoMount-v2.2.0-release-605.zip` must be installed separately through the KernelSU manager; driver and metamodule must be updated together. |
+| NoMount | `maxsteeel/nomount` v2.3.0 `ab93ee32a589ccb021257b3c1f280e058520d844` | base/wire protocol `23` | User-selected stable implementation. Built into the kernel (`CONFIG_NOMOUNT=y`). The matching userspace metamodule (`NoMount-v2.3.0-*.zip`) must be installed separately through the KernelSU manager; driver and metamodule should be updated together. |
 | Compiler | AOSP/Lineage Clang `r522817` | Clang/LLD 18.0.1 | Chosen over Clang 22 r596125 for this 4.14 tree: r522817 is already build-verified here, while the only r596125 prebuilt found was a third-party 1.09 GB mirror with no miatoll runtime evidence. Newer is not automatically safer for a vendor 4.14 kernel. |
 
 ## SM6250 kernel survey and ported improvements
@@ -53,7 +53,7 @@ scripts/build-miatoll.sh
 
 Result: `BUILD_EXIT=0`, `FINAL_PRETEST_BUILD_EXIT=0`.
 
-- Config gates passed: KSU, NoMount protocol 22, MEMCG, FAIR_GROUP_SCHED,
+- Config gates passed: KSU, NoMount protocol 23, MEMCG, FAIR_GROUP_SCHED,
   VM_EVENT_COUNTERS, KEYS, uclamp task+group, schedtune, BBR+BBRv3, DRM_MSM.
 - KCal negative gate passed; MSM display retained.
 - Tool audit: no GNU/non-LLVM compile/link invocations in `.cmd` files.
@@ -70,7 +70,7 @@ artifact for that SHA.
 1. Flash the AnyKernel3 ZIP in recovery (A-only miatoll layout).
 2. Boot once without adding new modules.
 3. Install/refresh the xxKSU manager (v3.3.1-34 generation, 32714).
-4. Install `NoMount-v2.2.0-release-605.zip` as a KernelSU metamodule.
+4. Install the NoMount v2.3.0 metamodule ZIP as a KernelSU metamodule.
 5. Verify root, then NoMount rules, then haptics/display/touch/Wi-Fi/thermal.
 
 Do not treat compilation as runtime proof. Keep a known-good boot/DTBO backup.

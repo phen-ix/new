@@ -190,7 +190,7 @@ grep -q "kernel.string=DOOM Kernel | miatoll (Clang 22, $VARIANT_LABEL)" "$STAGE
   echo "KSU_VERSION=$(sed -n 's/.*-DKSU_VERSION=\([0-9]*\).*/\1/p' "$ROOT/drivers/kernelsu/Makefile" | head -1)"
   echo "KSU_UAPI_VERSION=$(sed -n 's/^#define KERNEL_SU_UAPI_VERSION \([0-9]*\).*/\1/p' "$ROOT/drivers/kernelsu/include/uapi/supercall.h" | head -1)"
   echo "NOMOUNT_PROTOCOL=$(sed -n 's/^#define NOMOUNT_BASE_VERSION "\([0-9]*\)".*/\1/p' "$ROOT/fs/nomount/nomount.h" | head -1)"
-  echo "NOMOUNT_UPSTREAM=maxsteeel/nomount v2.2.0"
+  echo "NOMOUNT_UPSTREAM=maxsteeel/nomount v2.3.0"
   echo "RUNTIME_TESTED=no"
   echo "MODULES_INCLUDED=no (tcp_bic/tcp_htcp remain optional raw artifacts)"
 } > "$STAGE/PACKAGE_INFO.txt"
@@ -238,7 +238,7 @@ What this ZIP does NOT do:
   - It does not flash a ROM, recovery, vbmeta, or modem.
   - It does not include optional tcp_bic.ko / tcp_htcp.ko modules.
   - NoMount kernel support is built in, but the NoMount userspace metamodule
-    is NOT installed by this ZIP. Install maxsteeel/nomount v2.2.0 (protocol 22)
+    is NOT installed by this ZIP. Install maxsteeel/nomount v2.3.0 (protocol 23)
     from the KernelSU manager after booting this kernel.
   - It has NOT been runtime-tested on a device. Compilation and packaging
     verification only. Keep a known-good boot/dtbo backup before flashing.

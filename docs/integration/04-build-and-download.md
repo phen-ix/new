@@ -175,7 +175,7 @@ existing boot image, preserves the current boot ramdisk, and flashes a
 matching `dtbo.img` built from the four device overlays. It does not flash a
 ROM, recovery, vbmeta, or modem, and it does not install the optional
 `tcp_bic.ko` / `tcp_htcp.ko` modules. NoMount kernel support is built in
-(protocol 22), but the matching NoMount v2.2.0 userspace metamodule must be
+(protocol 23), but the matching NoMount v2.3.0 userspace metamodule must be
 installed separately through the KernelSU manager after boot.
 
 Verify the package before flashing:

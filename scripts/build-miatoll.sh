@@ -122,10 +122,10 @@ if [[ "$KCAL" == 0 ]] && grep -q '^CONFIG_DRM_MSM_KCAL_CTRL=' "$OUT_DIR/.config"
   echo "ERROR: KCal must remain removed from the nocal build" >&2
   exit 1
 fi
-# NoMount wire protocol is part of the user/kernel ABI. The v2.2.0 metamodule
-# requires protocol 22; do not silently package a mismatched driver.
-grep -q '^#define NOMOUNT_BASE_VERSION "22"$' "$ROOT/fs/nomount/nomount.h" || {
-  echo "ERROR: NoMount protocol 22 header not found" >&2
+# NoMount wire protocol is part of the user/kernel ABI. The v2.3.0 metamodule
+# is built against protocol 23; do not silently package a mismatched driver.
+grep -q '^#define NOMOUNT_BASE_VERSION "23"$' "$ROOT/fs/nomount/nomount.h" || {
+  echo "ERROR: NoMount protocol 23 header not found" >&2
   exit 1
 }
 
@@ -138,7 +138,7 @@ WIREGUARD_VERSION="$(sed -n 's/^#define WIREGUARD_VERSION "\(.*\)"$/\1/p' "$ROOT
   echo "ERROR: could not read WIREGUARD_VERSION from drivers/net/wireguard/version.h" >&2
   exit 1
 }
-echo "Required config validation passed; variant=$VARIANT; KCal $([[ $KCAL == 1 ]] && echo present || echo absent); MSM retained; NoMount protocol 22; Android 17 cgroup controllers enabled; default TCP congestion control bbr3." | tee "$LOG_DIR/config-validation.log"
+echo "Required config validation passed; variant=$VARIANT; KCal $([[ $KCAL == 1 ]] && echo present || echo absent); MSM retained; NoMount protocol 23; Android 17 cgroup controllers enabled; default TCP congestion control bbr3." | tee "$LOG_DIR/config-validation.log"
 
 set +e
 make -C "$ROOT" "${MAKE_ARGS[@]}" -j"$(nproc)" Image dtbs modules \
@@ -217,7 +217,7 @@ fi
   echo "OUTPUT_TYPE=raw Image, DTB/DTBO, modules and config; NOT a flashable boot image"
   echo "VARIANT=$VARIANT"
   echo "KCAL=$([[ $KCAL == 1 ]] && echo present || echo absent)"
-  echo "NOMOUNT_PROTOCOL=22"
+  echo "NOMOUNT_PROTOCOL=23"
   echo "WIREGUARD_VERSION=$WIREGUARD_VERSION"
   echo "KSU_VERSION=$(sed -n 's/.*-DKSU_VERSION=\([0-9]*\).*/\1/p' "$ROOT/drivers/kernelsu/Makefile" | head -1)"
   grep -E '^(CONFIG_DRM_MSM|CONFIG_UCLAMP_TASK|CONFIG_UCLAMP_TASK_GROUP|CONFIG_SCHED_TUNE|CONFIG_KSU|CONFIG_TCP_CONG_BBR|CONFIG_TCP_CONG_BBR3|CONFIG_DEFAULT_TCP_CONG|CONFIG_MEMCG|CONFIG_FAIR_GROUP_SCHED|CONFIG_VM_EVENT_COUNTERS|CONFIG_KEYS|CONFIG_NOMOUNT)=' "$OUT_DIR/.config"

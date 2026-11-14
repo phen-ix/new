@@ -17,7 +17,7 @@ A successful build is not a runtime guarantee.
 | BBRv3 algorithm | `google/bbr` `bbrv3-2025-03-18` | `90210de4b779d40496dee0b89081780eeddf2a60` | BBRv3 model, not BBRv1 |
 | BBRv3 mainline compatibility | `stardock/tcp_bbr_modules` | `45731d211025c30702316590f1f01d7aa59811b9` | compatibility/accessor layer only; reviewed against Google source |
 | KCal | removed at the user’s request | Revert of `bd1c180c3` | MSM display sources restored to the pre-integration baseline; no KCal feature is enabled |
-| NoMount | `maxsteeel/nomount` v2.2.0 | `bf1847f98fed382369c43bfd652cd93774b9b8e3` | built-in `fs/nomount`; wire protocol/base version 22; Kconfig `default n` and `depends on KEYS` |
+| NoMount | `maxsteeel/nomount` v2.3.0 | `ab93ee32a589ccb021257b3c1f280e058520d844` | built-in `fs/nomount`; wire protocol/base version 23; Kconfig `default n` and `depends on KEYS` |
 | AW8624 haptics | `Saamitk/Kinesis` branch `17` | `3d955e5d8187ad8229f7c6932226a2aa565fe30b` | maintained driver from `arshad-jamil33/android_kernel_xiaomi_sm6250@16.2`; two trailing-whitespace lines stripped locally |
 
 ## 1. Pure LLVM build plumbing
